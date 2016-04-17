@@ -144,6 +144,8 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
 			DispatchMessage(&msg);
 			continue;
 		}
+		float cc[4] = { 0.5, 0.5 ,0.5 ,0.5 };
+		d3dDeviceContext->ClearRenderTargetView(screenTextureRTV, cc);
 		imguiHandler->StartNewFrame();
 		imguiHandler->Render();
 
