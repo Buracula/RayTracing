@@ -3,10 +3,25 @@
 #include <glm\glm.hpp>
 #include <vector>
 
+struct Ray
+{
+	glm::vec3 origin;
+	glm::vec3 direction;
+};
+
+
+struct IntersectionPoint
+{
+	glm::vec3 position;
+	glm::vec3 normal;
+	glm::vec4 color;	
+};
+
+
 struct Sphere
 {
 	glm::vec3 center;
-	glm::vec3 color;
+	glm::vec4 color;
 	float radius;
 
 	Sphere()
@@ -19,12 +34,12 @@ struct Sphere
 struct Light
 {
 	glm::vec3 position;
-	glm::vec3 color;
+	glm::vec4 color;
 
 	Light()
 	{
 		position = glm::vec3(0);
-		color = glm::vec3(1);
+		color = glm::vec4(1);
 	}
 };
 
@@ -42,7 +57,13 @@ class RayTracer
 	float mAspectRatio;
 	float *mRenderTarget;
 
-	void Trace(const glm::vec3 &ray, float *output);
+	void Trace(const Ray &ray, glm::vec4 &outputColor);
+	bool FindClosestIntersection(const Ray &ray, IntersectionPoint &intersectionPoint, float& t);
+	glm::vec4 Shade(const IntersectionPoint &intersectionPoint, const Ray &ray);
+	void CalculateShadowRay(const IntersectionPoint &intersectionPoint, const Ray &ray, const Light &light, Ray &shadowRay);
+	bool InShadow(const Ray &shadowRay, const Light &light);
+	glm::vec4 PhongIllumination(const IntersectionPoint &intersectionPoint, const Ray &ray, const Light &light);
+	bool RaySphereIntersection(const Sphere &sphere, const Ray &ray, float &t);
 
 public:
 	RayTracer();
@@ -55,6 +76,10 @@ public:
 	void AddLight(const Light &light)
 	{
 		mLights.push_back(light);
+	}
+	const float *GetRenderTargetBuffer()
+	{
+		return mRenderTarget;
 	}
 	void Update();
 };

@@ -67,7 +67,7 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
 	//Create window
 	//////////////////////////////////////////////////////////////////////////
 	int screenWidth = 1280;
-	int screenHeight = 760;
+	int screenHeight = 720;
 
 	WNDCLASS windowClass;
 	ZeroMemory(&windowClass, sizeof(WNDCLASS));
@@ -119,11 +119,7 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
 	ID3D11Texture2D *screenTexture;
 	ID3D11RenderTargetView *screenTextureRTV;
 	d3dSwapChain->GetBuffer(0, __uuidof(ID3D11Texture2D), (void**)&screenTexture);
-
 	d3dDevice->CreateRenderTargetView(screenTexture, nullptr, &screenTextureRTV);
-	screenTexture->Release();
-	screenTexture = nullptr;
-
 	d3dDeviceContext->OMSetRenderTargets(1, &screenTextureRTV, nullptr);
 	//////////////////////////////////////////////////////////////////////////
 	//UI
@@ -133,7 +129,57 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
 	imguiHandler->Init();
 
 	RayTracer tracer;
-	
+
+	glm::vec3 camPos(-5,-5,5);
+	glm::vec3 targetPos(0);
+
+	tracer.SetCameraParams(camPos, targetPos, glm::vec3(0,0,1), screenWidth, screenHeight, 50.0f);
+
+	Light light1;
+	light1.color = glm::vec4(100,100,100,1);
+	light1.position = glm::vec3(-10,-10,10);
+
+	Sphere sphere1;
+	sphere1.color = glm::vec4(1.0f,0.0f,1.0f,0);
+	sphere1.radius = 3;
+
+	tracer.AddLight(light1);
+	tracer.AddSphere(sphere1);
+
+	tracer.Update();
+
+	unsigned int pixelCount = screenWidth * screenHeight;
+	const float *srcPtr = tracer.GetRenderTargetBuffer();
+	unsigned char *dstPointer = new unsigned char[pixelCount * 4];
+	for(int i_height = 0; i_height < screenHeight; i_height++)
+	{
+		for(int i_width = 0; i_width < screenWidth; i_width++)
+		{
+			if(i_width == screenWidth / 2 && i_height == screenHeight/2)
+			{
+				int a = 5;
+			}
+			int myindex = (i_height * screenWidth + i_width) * 4 + 0;
+
+			dstPointer[(i_height * screenWidth + i_width) * 4 + 0] = glm::clamp(srcPtr[(i_height * screenWidth + i_width) * 4 + 0],0.0f,1.f) * 255.0f;
+			dstPointer[(i_height * screenWidth + i_width) * 4 + 1] = glm::clamp(srcPtr[(i_height * screenWidth + i_width) * 4 + 1],0.0f,1.f) * 255.0f;
+			dstPointer[(i_height * screenWidth + i_width) * 4 + 2] = glm::clamp(srcPtr[(i_height * screenWidth + i_width) * 4 + 2],0.0f,1.f) * 255.0f;
+			dstPointer[(i_height * screenWidth + i_width) * 4 + 3] = glm::clamp(srcPtr[(i_height * screenWidth + i_width) * 4 + 3],0.0f,1.f) * 255.0f;
+		}
+	}
+// 	for (int i_pixel = 0; i_pixel < pixelCount; i_pixel++)
+// 	{
+// 		if(i_pixel == 76800)
+// 		{
+// 			int a = 5;
+// 		}
+// 		unsigned int pixelStart = i_pixel * 4;
+// 		dstPointer[pixelStart + 0] = glm::clamp(srcPtr[pixelStart + 0],0.0f,1.f) * 255.0f;
+// 		dstPointer[pixelStart + 1] = glm::clamp(srcPtr[pixelStart + 1],0.0f,1.f) * 255.0f;
+// 		dstPointer[pixelStart + 2] = glm::clamp(srcPtr[pixelStart + 2],0.0f,1.f) * 255.0f;
+// 		dstPointer[pixelStart + 3] = glm::clamp(srcPtr[pixelStart + 3],0.0f,1.f) * 255.0f;
+// 	}
+
 	MSG msg;
 	ZeroMemory(&msg, sizeof(MSG));
 	while (msg.message != WM_QUIT)
@@ -144,10 +190,11 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
 			DispatchMessage(&msg);
 			continue;
 		}
-		float cc[4] = { 0.5, 0.5 ,0.5 ,0.5 };
-		d3dDeviceContext->ClearRenderTargetView(screenTextureRTV, cc);
-		imguiHandler->StartNewFrame();
-		imguiHandler->Render();
+		float cc[4] = { 0.0, 0.0 ,0.0 ,0.0 };
+		d3dDeviceContext->UpdateSubresource(screenTexture, 0, nullptr, dstPointer, sizeof(unsigned char) * 4 * screenWidth, 0);
+
+// 		imguiHandler->StartNewFrame();
+// 		imguiHandler->Render();
 
 		d3dSwapChain->Present(0, 0);
 	}
