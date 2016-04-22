@@ -88,7 +88,7 @@ bool RayTracer::FindClosestIntersection(const Ray &ray, IntersectionPoint &inter
 
 	for (int i = 0; i < mSpheres.size(); i++)
 	{
-		if(RaySphereIntersection(mSpheres[i], ray, t))
+		if(RaySphereIntersection((*mSpheres[i]), ray, t))
 		{
 			if(t < minT)
 			{
@@ -101,8 +101,8 @@ bool RayTracer::FindClosestIntersection(const Ray &ray, IntersectionPoint &inter
 	if(minIndex != -1)
 	{
 		intersectionPoint.position = ray.origin + ray.direction * t;
-		intersectionPoint.color = mSpheres[minIndex].color;
-		intersectionPoint.normal = glm::normalize(intersectionPoint.position - mSpheres[minIndex].center);
+		intersectionPoint.color = mSpheres[minIndex]->color;
+		intersectionPoint.normal = glm::normalize(intersectionPoint.position - mSpheres[minIndex]->center);
 		t = minT;
 		return true;
 	}

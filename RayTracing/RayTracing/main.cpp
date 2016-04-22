@@ -94,7 +94,7 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
 	ID3D11DeviceContext *d3dDeviceContext = nullptr;
 	IDXGISwapChain *d3dSwapChain = nullptr;
 #ifdef _DEBUG
-	unsigned int deviceFlag = D3D11_CREATE_DEVICE_DEBUG;
+	unsigned int deviceFlag = 0;
 #else
 	unsigned int deviceFlag = 0;
 #endif
@@ -139,9 +139,9 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
 	light1.color = glm::vec4(100,100,100,1);
 	light1.position = glm::vec3(-10,-10,10);
 
-	Sphere sphere1;
-	sphere1.color = glm::vec4(1.0f,0.0f,1.0f,0);
-	sphere1.radius = 3;
+	Sphere *sphere1 = new Sphere;
+	sphere1->color = glm::vec4(1.0f,0.0f,1.0f,0);
+	sphere1->radius = 3;
 
 	tracer.AddLight(light1);
 	tracer.AddSphere(sphere1);

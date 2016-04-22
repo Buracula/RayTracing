@@ -29,6 +29,12 @@ struct Sphere
 		center = glm::vec3(0);
 		radius = 1;
 	}
+
+	bool IsInsideBoundaries(glm::vec3 minBoundary, glm::vec3 maxBoundary)
+	{
+		//TODO
+		return false;
+	}
 };
 
 struct Light
@@ -45,7 +51,7 @@ struct Light
 
 class RayTracer
 {	
-	std::vector<Sphere> mSpheres;
+	std::vector<Sphere*> mSpheres;
 	std::vector<Light> mLights;
 	glm::vec3 mCameraPos;
 	glm::vec3 mCameraDir;
@@ -69,7 +75,7 @@ public:
 	RayTracer();
 
 	void SetCameraParams(const glm::vec3 camPos, const glm::vec3 lookAt, const glm::vec3 upDir, int width, int height, float verticalFov);
-	void AddSphere(const Sphere &sphere)
+	void AddSphere(Sphere *sphere)
 	{
 		mSpheres.push_back(sphere);
 	}

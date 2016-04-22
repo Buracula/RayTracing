@@ -36,6 +36,9 @@
     <ClCompile Include="RayTracer.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
+    <ClCompile Include="Octree.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="..\..\Externals\imgui\imgui.h">
@@ -60,6 +63,9 @@
       <Filter>Source Files</Filter>
     </ClInclude>
     <ClInclude Include="RayTracer.h">
+      <Filter>Source Files</Filter>
+    </ClInclude>
+    <ClInclude Include="Octree.h">
       <Filter>Source Files</Filter>
     </ClInclude>
   </ItemGroup>
