@@ -1,40 +1,19 @@
 #pragma once
 
+#define USE_OCTREE
+
 #include <glm\glm.hpp>
 #include <vector>
 #include "Sphere.h"
 #include "Octree.h"
 
-struct Ray
-{
-	glm::vec3 origin;
-	glm::vec3 direction;
-};
 
-
-struct IntersectionPoint
-{
-	glm::vec3 position;
-	glm::vec3 normal;
-	glm::vec4 color;	
-};
-
-struct Light
-{
-	glm::vec3 position;
-	glm::vec4 color;
-
-	Light()
-	{
-		position = glm::vec3(0);
-		color = glm::vec4(1);
-	}
-};
 
 class RayTracer
 {	
 public:	//TODO public for debugging
 	std::vector<Sphere*> mSpheres;
+	Octree octree;
 private:
 	std::vector<Light> mLights;
 	glm::vec3 mCameraPos;
@@ -53,7 +32,6 @@ private:
 	void CalculateShadowRay(const IntersectionPoint &intersectionPoint, const Ray &ray, const Light &light, Ray &shadowRay);
 	bool InShadow(const Ray &shadowRay, const Light &light);
 	glm::vec4 PhongIllumination(const IntersectionPoint &intersectionPoint, const Ray &ray, const Light &light);
-	bool RaySphereIntersection(const Sphere &sphere, const Ray &ray, float &t);
 
 public:
 	RayTracer();

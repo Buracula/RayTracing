@@ -311,10 +311,10 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
 
 	RayTracer tracer;
 
-	glm::vec3 camPos(-11,-5,0);
+	glm::vec3 camPos(-15,-15,5);
 	glm::vec3 targetPos(0);
 	glm::vec3 camUp(0, 0, 1);
-	float verticalFov = 50;
+	float verticalFov = 25;
 	tracer.SetCameraParams(camPos, targetPos, camUp, screenWidth, screenHeight, verticalFov);
 
 	Light light1;
@@ -345,10 +345,6 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
 
 	for (int i_pixel = 0; i_pixel < pixelCount; i_pixel++)
 	{
-		if(i_pixel == 76800)
-		{
-			int a = 5;
-		}
 		unsigned int pixelStart = i_pixel * 4;
 		dstPointer[pixelStart + 0] = glm::clamp(srcPtr[pixelStart + 0],0.0f,1.f) * 255.0f;
 		dstPointer[pixelStart + 1] = glm::clamp(srcPtr[pixelStart + 1],0.0f,1.f) * 255.0f;
@@ -358,10 +354,8 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
 
 	Octree_renderer renderer(d3dDevice, screenWidth, screenHeight);
 	glm::mat4x4 viewMatrix = glm::lookAtRH(camPos, targetPos, camUp);
-	glm::mat4x4 projMatrix = glm::perspectiveRH(glm::radians(verticalFov), (float)screenWidth /(float)screenHeight, 0.01f, 1000.0f);
+	glm::mat4x4 projMatrix = glm::perspectiveRH(glm::radians(verticalFov*2), (float)screenWidth /(float)screenHeight, 0.01f, 1000.0f);
 	glm::mat4x4 viewProj = projMatrix * viewMatrix;
-	Octree tree(3);
-	tree.Build(tracer.mSpheres);
 	MSG msg;
 	ZeroMemory(&msg, sizeof(MSG));
 	while (msg.message != WM_QUIT)
@@ -373,9 +367,9 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
 			continue;
 		}
 		d3dDeviceContext->UpdateSubresource(screenTexture, 0, nullptr, dstPointer, sizeof(unsigned char) * 4 * screenWidth, 0);
-		renderer.Render(d3dDeviceContext, &tree, viewProj);
 // 		imguiHandler->StartNewFrame();
 // 		imguiHandler->Render();
+		renderer.Render(d3dDeviceContext, &tracer.octree, viewProj);
 
 		d3dSwapChain->Present(0, 0);
 	}

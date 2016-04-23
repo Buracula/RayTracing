@@ -2,6 +2,7 @@
 #include <assert.h>
 
 RayTracer::RayTracer()
+	:octree(3)
 {
 	mRenderTarget = nullptr;
 }
@@ -83,6 +84,9 @@ glm::vec4 RayTracer::PhongIllumination(const IntersectionPoint &intersectionPoin
 
 bool RayTracer::FindClosestIntersection(const Ray &ray, IntersectionPoint &intersectionPoint, float& t)
 {
+#ifdef USE_OCTREE
+	return octree.FindClosestIntersection(ray, intersectionPoint, t);
+#else
 	float minT = FLT_MAX;
 	int minIndex = -1;
 
@@ -110,105 +114,7 @@ bool RayTracer::FindClosestIntersection(const Ray &ray, IntersectionPoint &inter
 	{
 		return false;
 	}
-}
-
-bool RayTracer::RaySphereIntersection(const Sphere &sphere, const Ray &ray, float &t)
-{
-	glm::vec3 o_c = ray.origin - sphere.center;
-	float dDotD = glm::dot(ray.direction, ray.direction);
-
-	float delta = glm::pow(glm::dot(ray.direction, (o_c)), 2)  
-		-dDotD *( glm::dot(o_c, o_c) - pow(sphere.radius, 2));
-
-	if(delta < 0)
-	{
-		return false;
-	}
-	else
-	{
-		float t1 = (-glm::dot(ray.direction, o_c) + glm::sqrt(delta)) / dDotD;
-        float t2 = (-glm::dot(ray.direction, o_c) - glm::sqrt(delta)) / dDotD;
-
-		float minRoot;
-		float maxRoot;
-		if (t1 > t2)
-		{
-			minRoot = t2;
-			maxRoot = t1;
-		}
-		else
-		{
-			minRoot = t2;
-			maxRoot = t1;
-		}
-
-		if(minRoot < 0)
-		{
-			if(maxRoot < 0)
-			{
-				return false;
-			}
-			else
-			{
-				t = maxRoot;
-				return true;
-			}
-		}
-		else
-		{
-			t = minRoot;
-			return true;
-		}
-
-// 		if(t1 < t2)
-// 		{
-// 			if(t1 < 0)
-// 			{
-// 				if(t2 < 0)
-// 				{
-// 					return false;
-// 				}
-// 				else
-// 				{
-// 					t = t2;
-// 					return true;
-// 				}
-// 			}
-// 			else
-// 			{
-// 				t = t1;
-// 				return true;
-// 			}
-// 		}
-// 		else
-// 		{
-// 			if(t2 < 0)
-// 			{
-// 				if(t1 < 0)
-// 				{
-// 					if (t2 < 0)
-// 					{
-// 						return false;
-// 					}
-// 					else
-// 					{
-// 						t = t2;
-// 						return true;
-// 					}
-// 				}
-// 				else
-// 				{
-// 					t = t1;
-// 					return true;
-// 				}
-// 			}
-// 			else
-// 			{
-// 				t = t2;
-// 				return true;
-// 			}
-// 		}
-	}
+#endif
 }
 
 
@@ -224,11 +130,12 @@ void RayTracer::SetCameraParams(const glm::vec3 camPos, const glm::vec3 lookAt, 
 	float nearPlaneHalfHeight = glm::tan(glm::radians(verticalFov));
 	float nearPlaneHalfWidth = nearPlaneHalfHeight * mAspectRatio;
 
-	glm::vec3 cameraSideNormalized = glm::cross(mCameraDir, upDirNormalized);
-	glm::vec3 cameraUpNormalized = glm::cross(cameraSideNormalized, mCameraDir);
+	glm::vec3 cameraSideNormalized = glm::normalize(glm::cross(mCameraDir, upDirNormalized));
+	glm::vec3 cameraUpNormalized = glm::normalize(glm::cross(cameraSideNormalized, mCameraDir));
 
 	mNearPlaneSide = cameraSideNormalized * nearPlaneHalfWidth;
 	mNearPlaneUp = cameraUpNormalized * nearPlaneHalfHeight;
+
 	mWidth = width;
 	mHeight = height;
 
@@ -241,9 +148,7 @@ void RayTracer::SetCameraParams(const glm::vec3 camPos, const glm::vec3 lookAt, 
 
 void RayTracer::Update()
 {
-	Octree tree(3);
-	tree.Build(mSpheres);
-
+	octree.Build(mSpheres);
 
 	glm::vec2 dimension(mWidth, mHeight);
 	glm::vec2 _2(2.0f);
@@ -254,7 +159,7 @@ void RayTracer::Update()
 	{
 		for (int x = 0; x < mWidth; x++)
 		{
-			if(x == mWidth / 2 && y == mHeight/2)
+			if(x == 754 && y == (279 - 34))
 			{
 				int a = 5;
 			}
@@ -269,17 +174,6 @@ void RayTracer::Update()
 			ray.origin = mCameraPos;
 			glm::vec4 oc;
 			Trace(ray, oc);
-			if(ssPos.g > 0)
-			{
-				int a = 5;
-			}
-// 			int myindex = (y * mWidth + x) * 4;
-// 
-// 			mRenderTarget[(y * mWidth + x) * 4 + 0] = rand() / (float)RAND_MAX;
-// 			mRenderTarget[(y * mWidth + x) * 4 + 1] = rand() / (float)RAND_MAX;
-// 			mRenderTarget[(y * mWidth + x) * 4 + 2] = 0;
-// 			mRenderTarget[(y * mWidth + x) * 4 + 3] = 0;
-
 			targetPtr[0] = oc.r;
 			targetPtr[1] = oc.g;
 			targetPtr[2] = oc.b;
