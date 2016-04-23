@@ -275,7 +275,7 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
 	ID3D11DeviceContext *d3dDeviceContext = nullptr;
 	IDXGISwapChain *d3dSwapChain = nullptr;
 #ifdef _DEBUG
-	unsigned int deviceFlag = D3D11_CREATE_DEVICE_DEBUG;
+	unsigned int deviceFlag = 0;
 #else
 	unsigned int deviceFlag = 0;
 #endif
