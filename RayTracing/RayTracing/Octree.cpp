@@ -30,10 +30,10 @@ void Octree::BuildChilds(OctreeNode *node)
 
 	glm::vec3 minCoordinates2, maxCoordinates2;
 	minCoordinates2 = node->minCoordinates;
-	maxCoordinates2 = node->maxCoordinates;
+	maxCoordinates2 = node->minCoordinates;
 	minCoordinates2.x += parentDim.x / 2;
-	maxCoordinates2.y -= parentDim.y / 2;
-	maxCoordinates2.z -= parentDim.z / 2;
+	maxCoordinates2.y += parentDim.y / 2;
+	maxCoordinates2.z += parentDim.z / 2;
 	CreateChild(node, minCoordinates2, maxCoordinates2);
 
 	glm::vec3 minCoordinates3, maxCoordinates3;
@@ -66,10 +66,12 @@ void Octree::BuildChilds(OctreeNode *node)
 
 	glm::vec3 minCoordinates6, maxCoordinates6;
 	minCoordinates6 = node->minCoordinates;
-	maxCoordinates6 = node->maxCoordinates;
+	maxCoordinates6 = node->minCoordinates;
 	minCoordinates6.x += parentDim.x / 2;
-	minCoordinates6.z -= parentDim.z / 2;
-	maxCoordinates6.y -= parentDim.y / 2;
+	minCoordinates6.z += parentDim.z / 2;
+	maxCoordinates6.x = node->maxCoordinates.x;
+	maxCoordinates6.y += parentDim.y / 2;
+	maxCoordinates6.z = node->maxCoordinates.z;
 	CreateChild(node, minCoordinates6, maxCoordinates6);
 
 	glm::vec3 minCoordinates7, maxCoordinates7;
