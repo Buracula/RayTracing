@@ -68,7 +68,7 @@ void Octree::BuildChilds(OctreeNode *node)
 	minCoordinates6 = node->minCoordinates;
 	maxCoordinates6 = node->maxCoordinates;
 	minCoordinates6.x += parentDim.x / 2;
-	minCoordinates6.z += parentDim.z / 2;
+	minCoordinates6.z -= parentDim.z / 2;
 	maxCoordinates6.y -= parentDim.y / 2;
 	CreateChild(node, minCoordinates6, maxCoordinates6);
 
