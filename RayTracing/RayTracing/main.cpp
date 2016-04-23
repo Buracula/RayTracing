@@ -139,12 +139,21 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
 	light1.color = glm::vec4(100,100,100,1);
 	light1.position = glm::vec3(-10,-10,10);
 
-	Sphere *sphere1 = new Sphere;
-	sphere1->color = glm::vec4(1.0f,0.0f,1.0f,0);
-	sphere1->radius = 3;
+	Sphere *sphere1 = new Sphere(3, glm::vec3(15, 5, 0), glm::vec4(1.0f, 0.0f, 1.0f, 1.0f));
+	Sphere *sphere2 = new Sphere(0.5f, glm::vec3(16, 17.5f, 0), glm::vec4(1.0f, 0.0f, 1.0f, 1.0f));
+	Sphere *sphere3 = new Sphere(0.5f, glm::vec3(17.5f, 17.5f, 0), glm::vec4(1.0f, 0.0f, 1.0f, 1.0f));
+	Sphere *sphere4 = new Sphere(0.5f, glm::vec3(19.5f, 19.5f, 0), glm::vec4(1.0f, 0.0f, 1.0f, 1.0f));
+	Sphere *sphere5 = new Sphere(1, glm::vec3(1, 1, 0), glm::vec4(1.0f, 0.0f, 1.0f, 1.0f));
+	Sphere *sphere6 = new Sphere(0.5f, glm::vec3(11, 11, 0), glm::vec4(1.0f, 0.0f, 1.0f, 1.0f));
+
 
 	tracer.AddLight(light1);
 	tracer.AddSphere(sphere1);
+	tracer.AddSphere(sphere2);
+	tracer.AddSphere(sphere3);
+	tracer.AddSphere(sphere4);
+	tracer.AddSphere(sphere5);
+	tracer.AddSphere(sphere6);
 
 	tracer.Update();
 

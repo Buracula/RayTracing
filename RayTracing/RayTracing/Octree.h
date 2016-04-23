@@ -1,6 +1,5 @@
-
 #include <glm\glm.hpp>
-#include "RayTracer.h"
+#include "Sphere.h"
 
 
 struct OctreeNode
@@ -38,11 +37,13 @@ private:
 class Octree
 {
 	int maxPrimitivePerLeaf;
-
 	OctreeNode *root;
 
 	void FindBoundingBoxCoordinates(const std::vector<Sphere*> &spheres, glm::vec3 &minCoordinates, glm::vec3 &maxCoordinates);
-	
+	void BuildChilds(OctreeNode *node);
+	void CreateChild(OctreeNode *node, glm::vec3 &minCoordinates, glm::vec3 &maxCoordinates);
+	void FindChildSpheres(const std::vector<Sphere*> &parentSpheres, std::vector<Sphere*> &childSpheres, glm::vec3 &minCoordinates, glm::vec3 &maxCoordinates);
+
 
 public:
 
@@ -52,10 +53,5 @@ public:
 	}
 
 	void Build(const std::vector<Sphere*> &spheres);
-
-	void BuildChilds(OctreeNode *node);
-	void CreateChild(OctreeNode *node, glm::vec3 &minCoordinates, glm::vec3 &maxCoordinates);
-
-	void FindChildSpheres(const std::vector<Sphere*> &parentSpheres, std::vector<Sphere*> &childSpheres, glm::vec3 &minCoordinates, glm::vec3 &maxCoordinates);
-
+	
 };

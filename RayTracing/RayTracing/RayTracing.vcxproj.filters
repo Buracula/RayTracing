@@ -68,5 +68,8 @@
     <ClInclude Include="Octree.h">
       <Filter>Source Files</Filter>
     </ClInclude>
+    <ClInclude Include="Sphere.h">
+      <Filter>Source Files</Filter>
+    </ClInclude>
   </ItemGroup>
 </Project>

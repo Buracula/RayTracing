@@ -241,6 +241,10 @@ void RayTracer::SetCameraParams(const glm::vec3 camPos, const glm::vec3 lookAt, 
 
 void RayTracer::Update()
 {
+	Octree tree(3);
+	tree.Build(mSpheres);
+
+
 	glm::vec2 dimension(mWidth, mHeight);
 	glm::vec2 _2(2.0f);
 	glm::vec2 minus1(-1.0f);

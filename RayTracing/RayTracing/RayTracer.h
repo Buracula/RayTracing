@@ -2,6 +2,8 @@
 
 #include <glm\glm.hpp>
 #include <vector>
+#include "Sphere.h"
+#include "Octree.h"
 
 struct Ray
 {
@@ -15,26 +17,6 @@ struct IntersectionPoint
 	glm::vec3 position;
 	glm::vec3 normal;
 	glm::vec4 color;	
-};
-
-
-struct Sphere
-{
-	glm::vec3 center;
-	glm::vec4 color;
-	float radius;
-
-	Sphere()
-	{
-		center = glm::vec3(0);
-		radius = 1;
-	}
-
-	bool IsInsideBoundaries(glm::vec3 minBoundary, glm::vec3 maxBoundary)
-	{
-		//TODO
-		return false;
-	}
 };
 
 struct Light
