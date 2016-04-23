@@ -1,10 +1,191 @@
+
+#include <d3dcompiler.h>
 #include <windows.h>
 #include <d3d11.h>
 #include <glm/glm.hpp>
+#include <glm/gtc/matrix_transform.hpp>
 #include <imgui.h>
 
 #include "imguiHandler.h"
 #include "RayTracer.h"
+#include "Octree.h"
+
+#define SAFE_RELEASE(x) if((x)){(x)->Release();}
+
+class Octree_renderer
+{
+	ID3D11Buffer *vertexBuffer;
+	ID3D11Buffer *constantBuffer;
+	ID3D11VertexShader *vertexShader;
+	ID3D11PixelShader *pixelShader;
+	ID3D11InputLayout *inputLayout;
+	D3D11_VIEWPORT viewPort;
+
+	void RenderNode(ID3D11DeviceContext *d3dDeviceContext, OctreeNode *node)
+	{
+		glm::vec3 positions[32];
+
+		float minX = node->minCoordinates.x;
+		float minY = node->minCoordinates.y;
+		float minZ = node->minCoordinates.z;
+		float maxX = node->maxCoordinates.x;
+		float maxY = node->maxCoordinates.y;
+		float maxZ = node->maxCoordinates.z;
+		
+		int i = 0;
+		positions[i++] = glm::vec3(minX, minY, minZ);
+		positions[i++] = glm::vec3(minX, maxY, minZ);
+
+		positions[i++] = glm::vec3(minX, maxY, minZ);
+		positions[i++] = glm::vec3(minX, maxY, maxZ);
+
+		positions[i++] = glm::vec3(minX, maxY, maxZ);
+		positions[i++] = glm::vec3(minX, minY, maxZ);
+
+		positions[i++] = glm::vec3(minX, minY, maxZ);
+		positions[i++] = glm::vec3(minX, minY, minZ);
+
+
+
+		positions[i++] = glm::vec3(minX, minY, minZ);
+		positions[i++] = glm::vec3(maxX, minY, minZ);
+
+		positions[i++] = glm::vec3(maxX, minY, minZ);
+		positions[i++] = glm::vec3(maxX, minY, maxZ);
+
+		positions[i++] = glm::vec3(maxX, minY, maxZ);
+		positions[i++] = glm::vec3(minX, minY, maxZ);
+
+		positions[i++] = glm::vec3(minX, minY, maxZ);
+		positions[i++] = glm::vec3(minX, minY, minZ);
+
+
+
+		positions[i++] = glm::vec3(maxX, minY, minZ);
+		positions[i++] = glm::vec3(maxX, maxY, minZ);
+
+		positions[i++] = glm::vec3(maxX, maxY, minZ);
+		positions[i++] = glm::vec3(maxX, maxY, maxZ);
+
+		positions[i++] = glm::vec3(maxX, maxY, maxZ);
+		positions[i++] = glm::vec3(maxX, minY, maxZ);
+
+		positions[i++] = glm::vec3(maxX, minY, maxZ);
+		positions[i++] = glm::vec3(maxX, minY, minZ);
+
+
+
+		positions[i++] = glm::vec3(maxX, maxY, minZ);
+		positions[i++] = glm::vec3(maxX, maxY, maxZ);
+
+		positions[i++] = glm::vec3(maxX, maxY, maxZ);
+		positions[i++] = glm::vec3(minX, maxY, maxZ);
+
+		positions[i++] = glm::vec3(minX, maxY, maxZ);
+		positions[i++] = glm::vec3(minX, maxY, minZ);
+
+		positions[i++] = glm::vec3(minX, maxY, minZ);
+		positions[i++] = glm::vec3(maxX, maxY, minZ);
+
+		D3D11_MAPPED_SUBRESOURCE msr;
+		d3dDeviceContext->Map(vertexBuffer, 0, D3D11_MAP_WRITE_DISCARD, 0, &msr);
+		memcpy(msr.pData, positions, sizeof(glm::vec3) * 32);
+		d3dDeviceContext->Unmap(vertexBuffer, 0);
+
+		d3dDeviceContext->Draw(32, 0);
+
+		if (!node->isLeafNode)
+		{
+			for (int i_child = 0; i_child < 8; i_child++)
+			{
+				RenderNode(d3dDeviceContext, &node->childNodes[i_child]);
+			}
+		}		
+	}
+
+public:
+	Octree_renderer(ID3D11Device *d3dDevice, int screenWidth, int screenHeight)
+	{
+		vertexBuffer = nullptr;
+		constantBuffer = nullptr;
+		vertexShader = nullptr;
+		pixelShader = nullptr;
+
+		viewPort.Height = screenHeight;
+		viewPort.MaxDepth = 1.0f;
+		viewPort.MinDepth = 0;
+		viewPort.TopLeftX = 0;
+		viewPort.TopLeftY = 0;
+		viewPort.Width = screenWidth;
+
+		{
+			D3D11_BUFFER_DESC bd;
+			ZeroMemory(&bd, sizeof(D3D11_BUFFER_DESC));
+			bd.BindFlags = D3D11_BIND_VERTEX_BUFFER;
+			bd.ByteWidth = sizeof(glm::vec3) * 32;
+			bd.Usage = D3D11_USAGE_DYNAMIC;
+			bd.CPUAccessFlags = D3D11_CPU_ACCESS_WRITE;
+			d3dDevice->CreateBuffer(&bd, nullptr, &vertexBuffer);
+		}
+		{
+			D3D11_BUFFER_DESC bd;
+			ZeroMemory(&bd, sizeof(D3D11_BUFFER_DESC));
+			bd.BindFlags = D3D11_BIND_CONSTANT_BUFFER;
+			bd.ByteWidth = sizeof(glm::mat4x4);
+			bd.Usage = D3D11_USAGE_DYNAMIC;
+			bd.CPUAccessFlags = D3D11_CPU_ACCESS_WRITE;
+			d3dDevice->CreateBuffer(&bd, nullptr, &constantBuffer);
+		}
+
+		{
+			const char *ps =
+				"float4 main_ps() : SV_Target"
+				"{"
+				"	return float4(1,0,1,1);"
+				"}";
+			ID3DBlob *compiledCode;
+			ID3DBlob *errorCode;
+			D3DCompile(ps, strlen(ps), nullptr, nullptr, nullptr, "main_ps", "ps_4_0", 0, 0, &compiledCode, &errorCode);
+			d3dDevice->CreatePixelShader(compiledCode->GetBufferPointer(), compiledCode->GetBufferSize(), nullptr, &pixelShader);
+		}
+		{
+			const char *vs =
+				"cbuffer asd: register(b0){float4x4 viewProj;};"
+				"float4 main_vs(float3 position : POSITION) : SV_Position"
+				"{"
+				"	return mul(viewProj, float4(position,1.0));"
+				"}";
+			ID3DBlob *compiledCode;
+			ID3DBlob *errorCode;
+			D3DCompile(vs, strlen(vs), nullptr, nullptr, nullptr, "main_vs", "vs_4_0", 0, 0, &compiledCode, &errorCode);
+			d3dDevice->CreateVertexShader(compiledCode->GetBufferPointer(), compiledCode->GetBufferSize(), nullptr, &vertexShader);
+		
+			D3D11_INPUT_ELEMENT_DESC desc = { "POSITION", 0, DXGI_FORMAT_R32G32B32_FLOAT, 0, 0, D3D11_INPUT_PER_VERTEX_DATA, 0 };
+			d3dDevice->CreateInputLayout(&desc, 1, compiledCode->GetBufferPointer(), compiledCode->GetBufferSize(), &inputLayout);
+		}
+	}
+
+	void Render(ID3D11DeviceContext *d3dDeviceContext, Octree *octree, const glm::mat4x4 &viewProj)
+	{
+		d3dDeviceContext->IASetInputLayout(inputLayout);
+		UINT stride = sizeof(glm::vec3);
+		UINT offset = 0;
+		d3dDeviceContext->IASetVertexBuffers(0, 1, &vertexBuffer, &stride, &offset);
+		d3dDeviceContext->VSSetShader(vertexShader, 0, 0);
+		d3dDeviceContext->PSSetShader(pixelShader, 0, 0);
+		d3dDeviceContext->IASetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_LINELIST);
+
+		D3D11_MAPPED_SUBRESOURCE msr;
+		d3dDeviceContext->Map(constantBuffer, 0, D3D11_MAP_WRITE_DISCARD, 0, &msr);
+		memcpy(msr.pData, &viewProj, sizeof(glm::mat4x4));
+		d3dDeviceContext->Unmap(constantBuffer, 0);
+
+		d3dDeviceContext->VSSetConstantBuffers(0, 1, &constantBuffer);
+		d3dDeviceContext->RSSetViewports(1, &viewPort);
+
+		RenderNode(d3dDeviceContext, octree->GetRootNode());
+	}
+};
 
 IMGUI_API LRESULT ImGui_ImplDX11_WndProcHandler(HWND, UINT msg, WPARAM wParam, LPARAM lParam)
 {
@@ -94,7 +275,7 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
 	ID3D11DeviceContext *d3dDeviceContext = nullptr;
 	IDXGISwapChain *d3dSwapChain = nullptr;
 #ifdef _DEBUG
-	unsigned int deviceFlag = 0;
+	unsigned int deviceFlag = D3D11_CREATE_DEVICE_DEBUG;
 #else
 	unsigned int deviceFlag = 0;
 #endif
@@ -130,14 +311,15 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
 
 	RayTracer tracer;
 
-	glm::vec3 camPos(-5,-5,5);
+	glm::vec3 camPos(-11,-5,0);
 	glm::vec3 targetPos(0);
-
-	tracer.SetCameraParams(camPos, targetPos, glm::vec3(0,0,1), screenWidth, screenHeight, 50.0f);
+	glm::vec3 camUp(0, 0, 1);
+	float verticalFov = 50;
+	tracer.SetCameraParams(camPos, targetPos, camUp, screenWidth, screenHeight, verticalFov);
 
 	Light light1;
 	light1.color = glm::vec4(100,100,100,1);
-	light1.position = glm::vec3(-10,-10,10);
+	light1.position = glm::vec3(0,0,10);
 
 	Sphere *sphere1 = new Sphere(3, glm::vec3(15, 5, 0), glm::vec4(1.0f, 0.0f, 1.0f, 1.0f));
 	Sphere *sphere2 = new Sphere(0.5f, glm::vec3(16, 17.5f, 0), glm::vec4(1.0f, 0.0f, 1.0f, 1.0f));
@@ -160,35 +342,26 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
 	unsigned int pixelCount = screenWidth * screenHeight;
 	const float *srcPtr = tracer.GetRenderTargetBuffer();
 	unsigned char *dstPointer = new unsigned char[pixelCount * 4];
-	for(int i_height = 0; i_height < screenHeight; i_height++)
+
+	for (int i_pixel = 0; i_pixel < pixelCount; i_pixel++)
 	{
-		for(int i_width = 0; i_width < screenWidth; i_width++)
+		if(i_pixel == 76800)
 		{
-			if(i_width == screenWidth / 2 && i_height == screenHeight/2)
-			{
-				int a = 5;
-			}
-			int myindex = (i_height * screenWidth + i_width) * 4 + 0;
-
-			dstPointer[(i_height * screenWidth + i_width) * 4 + 0] = glm::clamp(srcPtr[(i_height * screenWidth + i_width) * 4 + 0],0.0f,1.f) * 255.0f;
-			dstPointer[(i_height * screenWidth + i_width) * 4 + 1] = glm::clamp(srcPtr[(i_height * screenWidth + i_width) * 4 + 1],0.0f,1.f) * 255.0f;
-			dstPointer[(i_height * screenWidth + i_width) * 4 + 2] = glm::clamp(srcPtr[(i_height * screenWidth + i_width) * 4 + 2],0.0f,1.f) * 255.0f;
-			dstPointer[(i_height * screenWidth + i_width) * 4 + 3] = glm::clamp(srcPtr[(i_height * screenWidth + i_width) * 4 + 3],0.0f,1.f) * 255.0f;
+			int a = 5;
 		}
+		unsigned int pixelStart = i_pixel * 4;
+		dstPointer[pixelStart + 0] = glm::clamp(srcPtr[pixelStart + 0],0.0f,1.f) * 255.0f;
+		dstPointer[pixelStart + 1] = glm::clamp(srcPtr[pixelStart + 1],0.0f,1.f) * 255.0f;
+		dstPointer[pixelStart + 2] = glm::clamp(srcPtr[pixelStart + 2],0.0f,1.f) * 255.0f;
+		dstPointer[pixelStart + 3] = glm::clamp(srcPtr[pixelStart + 3],0.0f,1.f) * 255.0f;
 	}
-// 	for (int i_pixel = 0; i_pixel < pixelCount; i_pixel++)
-// 	{
-// 		if(i_pixel == 76800)
-// 		{
-// 			int a = 5;
-// 		}
-// 		unsigned int pixelStart = i_pixel * 4;
-// 		dstPointer[pixelStart + 0] = glm::clamp(srcPtr[pixelStart + 0],0.0f,1.f) * 255.0f;
-// 		dstPointer[pixelStart + 1] = glm::clamp(srcPtr[pixelStart + 1],0.0f,1.f) * 255.0f;
-// 		dstPointer[pixelStart + 2] = glm::clamp(srcPtr[pixelStart + 2],0.0f,1.f) * 255.0f;
-// 		dstPointer[pixelStart + 3] = glm::clamp(srcPtr[pixelStart + 3],0.0f,1.f) * 255.0f;
-// 	}
 
+	Octree_renderer renderer(d3dDevice, screenWidth, screenHeight);
+	glm::mat4x4 viewMatrix = glm::lookAtRH(camPos, targetPos, camUp);
+	glm::mat4x4 projMatrix = glm::perspectiveRH(glm::radians(verticalFov), (float)screenWidth /(float)screenHeight, 0.01f, 1000.0f);
+	glm::mat4x4 viewProj = projMatrix * viewMatrix;
+	Octree tree(3);
+	tree.Build(tracer.mSpheres);
 	MSG msg;
 	ZeroMemory(&msg, sizeof(MSG));
 	while (msg.message != WM_QUIT)
@@ -199,9 +372,8 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
 			DispatchMessage(&msg);
 			continue;
 		}
-		float cc[4] = { 0.0, 0.0 ,0.0 ,0.0 };
 		d3dDeviceContext->UpdateSubresource(screenTexture, 0, nullptr, dstPointer, sizeof(unsigned char) * 4 * screenWidth, 0);
-
+		renderer.Render(d3dDeviceContext, &tree, viewProj);
 // 		imguiHandler->StartNewFrame();
 // 		imguiHandler->Render();
 

@@ -262,7 +262,7 @@ void RayTracer::Update()
 			ssPos = ssPos / dimension;
 			ssPos = ssPos * _2 + minus1;
 
-			glm::vec3 pixelWorldPos = nearPlaneCenter + mNearPlaneUp * ssPos.y + mNearPlaneSide * ssPos.x;
+			glm::vec3 pixelWorldPos = nearPlaneCenter + mNearPlaneUp * -ssPos.y + mNearPlaneSide * ssPos.x;
 			glm::vec3 rayDir = glm::normalize(pixelWorldPos - mCameraPos);
 			Ray ray;
 			ray.direction = rayDir;

@@ -1,3 +1,5 @@
+#pragma once
+
 #include <glm\glm.hpp>
 #include "Sphere.h"
 
@@ -51,7 +53,10 @@ public:
 	{
 		this->maxPrimitivePerLeaf = maxPrimitivePerLeaf;
 	}
-
+	OctreeNode *GetRootNode()
+	{
+		return root;
+	}
 	void Build(const std::vector<Sphere*> &spheres);
 	
 };

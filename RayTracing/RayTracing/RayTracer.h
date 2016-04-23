@@ -33,7 +33,9 @@ struct Light
 
 class RayTracer
 {	
+public:	//TODO public for debugging
 	std::vector<Sphere*> mSpheres;
+private:
 	std::vector<Light> mLights;
 	glm::vec3 mCameraPos;
 	glm::vec3 mCameraDir;
