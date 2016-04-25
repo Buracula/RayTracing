@@ -35,6 +35,7 @@ public:
 
 	bool rebuildRequested;
 	int sphereCount;
+	bool sphereOverlap;
 	float minSphereRadiuses;
 	float maxSphereRadiuses;
 };

@@ -339,13 +339,43 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
 			tracer.Clear();
 			float minRadius = imguiHandler->minSphereRadiuses;
 			float maxRadius = imguiHandler->maxSphereRadiuses;
-			glm::vec3 maxSpherePos(80, 80, 5);
+			glm::vec3 maxSpherePos(200, 200, 5);
 			int sphereCount = imguiHandler->sphereCount;
 			for (int i_sphere = 0; i_sphere < sphereCount; i_sphere++)
 			{
-				glm::vec3 sphereCenter(RandomFloat(), RandomFloat(), RandomFloat());
-				sphereCenter *= maxSpherePos;
-				float sphereRad = RandomFloat() * (maxRadius - minRadius) + minRadius;
+				glm::vec3 sphereCenter;
+				float sphereRad;
+				if (!imguiHandler->sphereOverlap)
+				{
+					bool validSphere = true;
+					while (1)
+					{
+						sphereCenter = glm::vec3(RandomFloat(), RandomFloat(), RandomFloat());
+						sphereCenter *= maxSpherePos;
+						sphereRad = RandomFloat() * (maxRadius - minRadius) + minRadius;
+
+						for (int i_sphere = 0; i_sphere < tracer.mSpheres.size(); i_sphere++)
+						{
+							float distance = glm::length(tracer.mSpheres[i_sphere]->center - sphereCenter);
+							if (distance < tracer.mSpheres[i_sphere]->radius + sphereRad)
+							{
+								validSphere = false;
+								break;
+							}
+						}
+
+						if (validSphere)
+						{
+							break;
+						}
+					}
+				}
+				else
+				{
+					sphereCenter = glm::vec3(RandomFloat(), RandomFloat(), RandomFloat());
+					sphereCenter *= maxSpherePos;
+					sphereRad = RandomFloat() * (maxRadius - minRadius) + minRadius;
+				}
 				glm::vec4 sphereColor(RandomFloat(), RandomFloat(), RandomFloat(), 1);
 				Sphere *newSphere = new Sphere(sphereRad, sphereCenter, sphereColor);
 				tracer.AddSphere(newSphere);

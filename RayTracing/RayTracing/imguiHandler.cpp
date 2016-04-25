@@ -22,6 +22,7 @@ ImguiHandler::ImguiHandler(ID3D11DeviceContext *d3dDeviceContext, ID3D11Device *
 	g_pIB = NULL;
 	rebuildRequested = true;
 	sphereCount = 3;
+	sphereOverlap = true;
 	minSphereRadiuses = 1;
 	maxSphereRadiuses = 5;
 }
@@ -248,15 +249,20 @@ void ImguiHandler::StartNewFrame()
 void ImguiHandler::Render()
 {
 	bool show_test_window = true;
-	ImGui::SetNextWindowPos(ImVec2(650, 20), ImGuiSetCond_FirstUseEver);     // Normally user code doesn't need/want to call it because positions are saved in .ini file anyway. Here we just want to make the demo initial state a bit more friendly!
+	     // Normally user code doesn't need/want to call it because positions are saved in .ini file anyway. Here we just want to make the demo initial state a bit more friendly!
 	//ImGui::ShowTestWindow(&show_test_window);
+	ImGui::Begin("Settings");
+	ImGui::SetWindowPos(ImVec2(850, 20), ImGuiSetCond_FirstUseEver);
+	ImGui::SetWindowSize(ImVec2(400, 150), ImGuiSetCond_FirstUseEver);
 	ImGui::SliderFloat("Min Sphere Radius", &minSphereRadiuses, 0.5f, 10.0f);
 	ImGui::SliderFloat("Max Sphere Radius", &maxSphereRadiuses, 0.5f, 10.0f);
 	ImGui::SliderInt("Sphere Count", &sphereCount, 1, 200);
+	ImGui::Checkbox("Spheres can overlap", &sphereOverlap);
 	if (ImGui::Button("Update"))
 	{
 		rebuildRequested = true;
 	}
+	ImGui::End();
 
 	ImGui::Render();
 }
