@@ -50,4 +50,14 @@ public:
 		return mRenderTarget;
 	}
 	void Update();
+	void Clear()
+	{
+		octree.Clear();
+		for (int i_sphere = 0; i_sphere < mSpheres.size(); i_sphere++)
+		{
+			delete mSpheres[i_sphere];
+		}
+		mSpheres.clear();
+		mLights.clear();
+	}
 };

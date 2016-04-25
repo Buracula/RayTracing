@@ -20,6 +20,10 @@ ImguiHandler::ImguiHandler(ID3D11DeviceContext *d3dDeviceContext, ID3D11Device *
 	g_IndexBufferSize = 10000;
 	g_pVB = NULL;
 	g_pIB = NULL;
+	rebuildRequested = true;
+	sphereCount = 3;
+	minSphereRadiuses = 1;
+	maxSphereRadiuses = 5;
 }
 
 void ImguiHandler::Init()
@@ -245,7 +249,14 @@ void ImguiHandler::Render()
 {
 	bool show_test_window = true;
 	ImGui::SetNextWindowPos(ImVec2(650, 20), ImGuiSetCond_FirstUseEver);     // Normally user code doesn't need/want to call it because positions are saved in .ini file anyway. Here we just want to make the demo initial state a bit more friendly!
-	ImGui::ShowTestWindow(&show_test_window);
+	//ImGui::ShowTestWindow(&show_test_window);
+	ImGui::SliderFloat("Min Sphere Radius", &minSphereRadiuses, 0.5f, 10.0f);
+	ImGui::SliderFloat("Max Sphere Radius", &maxSphereRadiuses, 0.5f, 10.0f);
+	ImGui::SliderInt("Sphere Count", &sphereCount, 1, 200);
+	if (ImGui::Button("Update"))
+	{
+		rebuildRequested = true;
+	}
 
 	ImGui::Render();
 }

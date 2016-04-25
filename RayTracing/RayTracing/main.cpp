@@ -322,61 +322,9 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
 	float verticalFov = 25;
 	tracer.SetCameraParams(camPos, targetPos, camUp, screenWidth, screenHeight, verticalFov);
 
-	Light light1;
-	light1.color = glm::vec4(1000,1000,1000,1);
-	light1.position = glm::vec3(0,0,15);
-
-	Light light2;
-	light2.color = glm::vec4(60, 60, 60, 1);
-	light2.position = glm::vec3(20, 20, 2);
-
-	Sphere *sphere1 = new Sphere(3, glm::vec3(5, 5, 0), glm::vec4(1.0f, 0.0f, 1.0f, 1.0f));
-	Sphere *sphere7 = new Sphere(3, glm::vec3(3, 3, -6), glm::vec4(1.0f, 0.0f, 1.0f, 1.0f));
-	Sphere *sphere2 = new Sphere(0.5f, glm::vec3(16, 17.5f, 0), glm::vec4(1.0f, 0.0f, 1.0f, 1.0f));
-	Sphere *sphere3 = new Sphere(0.5f, glm::vec3(17.5f, 17.5f, 0), glm::vec4(1.0f, 0.0f, 1.0f, 1.0f));
-	Sphere *sphere4 = new Sphere(0.5f, glm::vec3(19.5f, 19.5f, 0), glm::vec4(1.0f, 0.0f, 1.0f, 1.0f));
-	Sphere *sphere5 = new Sphere(1, glm::vec3(1, 0.1, 0), glm::vec4(1.0f, 0.0f, 1.0f, 1.0f));
-	Sphere *sphere6 = new Sphere(0.5f, glm::vec3(11, 11, 0), glm::vec4(1.0f, 0.0f, 1.0f, 1.0f));
-
-
-	tracer.AddLight(light1);
-// 	tracer.AddLight(light2);
-// 	tracer.AddSphere(sphere1);
-// 	tracer.AddSphere(sphere2);
-// 	tracer.AddSphere(sphere3);
-// 	tracer.AddSphere(sphere4);
-// 	tracer.AddSphere(sphere5);
-// 	tracer.AddSphere(sphere6);
-// 	tracer.AddSphere(sphere7);
-
-	float minRadius = 1.0f;
-	float maxRadius = 5.0f;
-	glm::vec3 maxSpherePos(80, 80, 5);
-	int sphereCount = 30;
-	for (int i_sphere = 0; i_sphere < sphereCount; i_sphere++)
-	{
-		glm::vec3 sphereCenter(RandomFloat(), RandomFloat(), RandomFloat());
-		sphereCenter *= maxSpherePos;
-		float sphereRad = RandomFloat() * (maxRadius - minRadius) + minRadius;
-		glm::vec4 sphereColor(RandomFloat(), RandomFloat(), RandomFloat(),1);
-		Sphere *newSphere = new Sphere(sphereRad, sphereCenter, sphereColor);
-		tracer.AddSphere(newSphere);
-	}
-
-	tracer.Update();
-
 	unsigned int pixelCount = screenWidth * screenHeight;
 	const float *srcPtr = tracer.GetRenderTargetBuffer();
 	unsigned char *dstPointer = new unsigned char[pixelCount * 4];
-
-	for (int i_pixel = 0; i_pixel < pixelCount; i_pixel++)
-	{
-		unsigned int pixelStart = i_pixel * 4;
-		dstPointer[pixelStart + 0] = glm::clamp(srcPtr[pixelStart + 0],0.0f,1.f) * 255.0f;
-		dstPointer[pixelStart + 1] = glm::clamp(srcPtr[pixelStart + 1],0.0f,1.f) * 255.0f;
-		dstPointer[pixelStart + 2] = glm::clamp(srcPtr[pixelStart + 2],0.0f,1.f) * 255.0f;
-		dstPointer[pixelStart + 3] = glm::clamp(srcPtr[pixelStart + 3],0.0f,1.f) * 255.0f;
-	}
 
 	Octree_renderer renderer(d3dDevice, screenWidth, screenHeight);
 	glm::mat4x4 viewMatrix = glm::lookAtRH(camPos, targetPos, camUp);
@@ -386,6 +334,42 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
 	ZeroMemory(&msg, sizeof(MSG));
 	while (msg.message != WM_QUIT)
 	{
+		if (imguiHandler->rebuildRequested)
+		{
+			tracer.Clear();
+			float minRadius = imguiHandler->minSphereRadiuses;
+			float maxRadius = imguiHandler->maxSphereRadiuses;
+			glm::vec3 maxSpherePos(80, 80, 5);
+			int sphereCount = imguiHandler->sphereCount;
+			for (int i_sphere = 0; i_sphere < sphereCount; i_sphere++)
+			{
+				glm::vec3 sphereCenter(RandomFloat(), RandomFloat(), RandomFloat());
+				sphereCenter *= maxSpherePos;
+				float sphereRad = RandomFloat() * (maxRadius - minRadius) + minRadius;
+				glm::vec4 sphereColor(RandomFloat(), RandomFloat(), RandomFloat(), 1);
+				Sphere *newSphere = new Sphere(sphereRad, sphereCenter, sphereColor);
+				tracer.AddSphere(newSphere);
+			}
+
+			Light light1;
+			light1.color = glm::vec4(1000, 1000, 1000, 1);
+			light1.position = glm::vec3(0, 0, 15);
+
+			tracer.AddLight(light1);
+			tracer.Update();
+
+			for (int i_pixel = 0; i_pixel < pixelCount; i_pixel++)
+			{
+				unsigned int pixelStart = i_pixel * 4;
+				dstPointer[pixelStart + 0] = glm::clamp(srcPtr[pixelStart + 0], 0.0f, 1.f) * 255.0f;
+				dstPointer[pixelStart + 1] = glm::clamp(srcPtr[pixelStart + 1], 0.0f, 1.f) * 255.0f;
+				dstPointer[pixelStart + 2] = glm::clamp(srcPtr[pixelStart + 2], 0.0f, 1.f) * 255.0f;
+				dstPointer[pixelStart + 3] = glm::clamp(srcPtr[pixelStart + 3], 0.0f, 1.f) * 255.0f;
+			}
+
+			imguiHandler->rebuildRequested = false;
+		}
+
 		if (PeekMessage(&msg, NULL, 0U, 0U, PM_REMOVE))
 		{
 			TranslateMessage(&msg);

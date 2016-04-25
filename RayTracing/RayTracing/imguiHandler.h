@@ -25,12 +25,18 @@ class ImguiHandler
 	INT64 g_Time;
 	INT64 g_TicksPerSecond;
 
+
 public:
 	ImguiHandler(ID3D11DeviceContext *d3dDeviceContext, ID3D11Device *d3dDevice, HWND windowHandle);
 	void Init();
 	void StartNewFrame();
 	void Render();
 	void OnRender(ImDrawData* draw_data);
+
+	bool rebuildRequested;
+	int sphereCount;
+	float minSphereRadiuses;
+	float maxSphereRadiuses;
 };
 
 extern ImguiHandler *imguiHandler;

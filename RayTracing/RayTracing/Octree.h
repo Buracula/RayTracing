@@ -162,6 +162,11 @@ struct OctreeNode
 		childNodes = new OctreeNode[8];
 	}
 
+	~OctreeNode()
+	{
+		delete []childNodes;
+	}
+
 	void AddChild(OctreeNode &node)
 	{
 		childNodes[childCount] = node;
@@ -170,7 +175,11 @@ struct OctreeNode
 
 private:
 	int childCount;
-	OctreeNode(){};
+	OctreeNode()
+	{
+		childCount = 0;
+		childNodes = nullptr;
+	}
 };
 
 struct ChildPoint
@@ -289,11 +298,11 @@ class Octree
 		}
 	}
 public:
-
 	Octree(int maxPrimitivePerLeaf, int maxLevel)
 	{
 		this->maxPrimitivePerLeaf = maxPrimitivePerLeaf;
 		this->maxLevel = maxLevel;
+		root = nullptr;
 	}
 	OctreeNode *GetRootNode()
 	{
@@ -303,5 +312,10 @@ public:
 	bool FindClosestIntersection(const Ray &ray, IntersectionPoint &intersectionPoint, float& t)
 	{
 		return FindClosestIntersectionOfNode(root, ray, intersectionPoint, t);
+	}
+
+	void Clear()
+	{
+		delete root;
 	}
 };
