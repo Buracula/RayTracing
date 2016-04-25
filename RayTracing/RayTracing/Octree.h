@@ -128,6 +128,19 @@ __inline bool RaySphereIntersection(const Sphere &sphere, const Ray &ray, float 
 	}
 }
 
+__inline bool RayPlaneIntersection(const glm::vec3 &n, const glm::vec3 &p0, const Ray &ray, float &t)
+{
+	// assuming vectors are all normalized
+	float denom = glm::dot(n, ray.direction);
+	if (denom > 1e-6) {
+		glm::vec3 p0l0 = p0 - ray.origin;
+		t = glm::dot(p0l0, n) / denom;
+		return (t >= 0);
+	}
+
+	return false;
+}
+
 struct OctreeNode
 {
 	bool isLeafNode;
@@ -138,7 +151,7 @@ struct OctreeNode
 	OctreeNode* childNodes;
 
 
-	OctreeNode(glm::vec3 &minCoordinates, glm::vec3 &maxCoordinates,std::vector<Sphere*> &spheres, bool isLeafNode)
+	OctreeNode(glm::vec3 &minCoordinates, glm::vec3 &maxCoordinates,const std::vector<Sphere*> &spheres, bool isLeafNode)
 	{
 		this->minCoordinates = minCoordinates;
 		this->maxCoordinates = maxCoordinates;
@@ -174,36 +187,37 @@ __inline bool ChildPointComparisonFunc(const ChildPoint &a, const ChildPoint &b)
 class Octree
 {
 	int maxPrimitivePerLeaf;
+	int maxLevel;
 	OctreeNode *root;
 
 	void FindBoundingBoxCoordinates(const std::vector<Sphere*> &spheres, glm::vec3 &minCoordinates, glm::vec3 &maxCoordinates);
-	void BuildChilds(OctreeNode *node);
-	void CreateChild(OctreeNode *node, glm::vec3 &minCoordinates, glm::vec3 &maxCoordinates);
+	void BuildChilds(OctreeNode *node, int currentLevel);
+	void CreateChild(OctreeNode *node, glm::vec3 &minCoordinates, glm::vec3 &maxCoordinates, int currentLevel);
 	void FindChildSpheres(const std::vector<Sphere*> &parentSpheres, std::vector<Sphere*> &childSpheres, glm::vec3 &minCoordinates, glm::vec3 &maxCoordinates);
 
 	bool CheckRayBoxIntersection(const Ray &ray, const glm::vec3 &boxMin, const glm::vec3 &boxMax, float &outTMin)
 	{
-		double tmin = -INFINITY, tmax = INFINITY;
+		float tmin = -FLT_MAX, tmax = FLT_MAX;
 
 		if (ray.direction.x != 0.0) {
-			double tx1 = (boxMin.x - ray.origin.x) / ray.direction.x;
-			double tx2 = (boxMax.x - ray.origin.x) / ray.direction.x;
+			float tx1 = (boxMin.x - ray.origin.x) / ray.direction.x;
+			float tx2 = (boxMax.x - ray.origin.x) / ray.direction.x;
 
 			tmin = glm::max(tmin, glm::min(tx1, tx2));
 			tmax = glm::min(tmax, glm::max(tx1, tx2));
 		}
 
 		if (ray.direction.y != 0.0) {
-			double ty1 = (boxMin.y - ray.origin.y) / ray.direction.y;
-			double ty2 = (boxMax.y - ray.origin.y) / ray.direction.y;
+			float ty1 = (boxMin.y - ray.origin.y) / ray.direction.y;
+			float ty2 = (boxMax.y - ray.origin.y) / ray.direction.y;
 
 			tmin = glm::max(tmin, glm::min(ty1, ty2));
 			tmax = glm::min(tmax, glm::max(ty1, ty2));
 		}
 
 		if (ray.direction.z != 0.0) {
-			double tz1 = (boxMin.z - ray.origin.z) / ray.direction.z;
-			double tz2 = (boxMax.z - ray.origin.z) / ray.direction.z;
+			float tz1 = (boxMin.z - ray.origin.z) / ray.direction.z;
+			float tz2 = (boxMax.z - ray.origin.z) / ray.direction.z;
 
 			tmin = glm::max(tmin, glm::min(tz1, tz2));
 			tmax = glm::min(tmax, glm::max(tz1, tz2));
@@ -232,10 +246,10 @@ class Octree
 
 			if (minIndex != -1)
 			{
+				t = minT;
 				intersectionPoint.position = ray.origin + ray.direction * t;
 				intersectionPoint.color = node->spheres[minIndex]->color;
 				intersectionPoint.normal = glm::normalize(intersectionPoint.position - node->spheres[minIndex]->center);
-				t = minT;
 				return true;
 			}
 			else
@@ -276,9 +290,10 @@ class Octree
 	}
 public:
 
-	Octree(int maxPrimitivePerLeaf)
+	Octree(int maxPrimitivePerLeaf, int maxLevel)
 	{
 		this->maxPrimitivePerLeaf = maxPrimitivePerLeaf;
+		this->maxLevel = maxLevel;
 	}
 	OctreeNode *GetRootNode()
 	{

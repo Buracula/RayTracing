@@ -242,6 +242,11 @@ LRESULT CALLBACK windowPrecedure(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lPar
 	return DefWindowProc(hwnd, msg, wParam, lParam);
 }
 
+float RandomFloat()
+{
+	return rand() / (float)RAND_MAX;
+}
+
 int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine, int nShowCmd)
 {
 	//////////////////////////////////////////////////////////////////////////
@@ -311,31 +316,52 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
 
 	RayTracer tracer;
 
-	glm::vec3 camPos(-15,-15,5);
+	glm::vec3 camPos(-25,-25,10);
 	glm::vec3 targetPos(0);
 	glm::vec3 camUp(0, 0, 1);
 	float verticalFov = 25;
 	tracer.SetCameraParams(camPos, targetPos, camUp, screenWidth, screenHeight, verticalFov);
 
 	Light light1;
-	light1.color = glm::vec4(100,100,100,1);
-	light1.position = glm::vec3(0,0,10);
+	light1.color = glm::vec4(1000,1000,1000,1);
+	light1.position = glm::vec3(0,0,15);
 
-	Sphere *sphere1 = new Sphere(3, glm::vec3(15, 5, 0), glm::vec4(1.0f, 0.0f, 1.0f, 1.0f));
+	Light light2;
+	light2.color = glm::vec4(60, 60, 60, 1);
+	light2.position = glm::vec3(20, 20, 2);
+
+	Sphere *sphere1 = new Sphere(3, glm::vec3(5, 5, 0), glm::vec4(1.0f, 0.0f, 1.0f, 1.0f));
+	Sphere *sphere7 = new Sphere(3, glm::vec3(3, 3, -6), glm::vec4(1.0f, 0.0f, 1.0f, 1.0f));
 	Sphere *sphere2 = new Sphere(0.5f, glm::vec3(16, 17.5f, 0), glm::vec4(1.0f, 0.0f, 1.0f, 1.0f));
 	Sphere *sphere3 = new Sphere(0.5f, glm::vec3(17.5f, 17.5f, 0), glm::vec4(1.0f, 0.0f, 1.0f, 1.0f));
 	Sphere *sphere4 = new Sphere(0.5f, glm::vec3(19.5f, 19.5f, 0), glm::vec4(1.0f, 0.0f, 1.0f, 1.0f));
-	Sphere *sphere5 = new Sphere(1, glm::vec3(1, 1, 0), glm::vec4(1.0f, 0.0f, 1.0f, 1.0f));
+	Sphere *sphere5 = new Sphere(1, glm::vec3(1, 0.1, 0), glm::vec4(1.0f, 0.0f, 1.0f, 1.0f));
 	Sphere *sphere6 = new Sphere(0.5f, glm::vec3(11, 11, 0), glm::vec4(1.0f, 0.0f, 1.0f, 1.0f));
 
 
 	tracer.AddLight(light1);
-	tracer.AddSphere(sphere1);
-	tracer.AddSphere(sphere2);
-	tracer.AddSphere(sphere3);
-	tracer.AddSphere(sphere4);
-	tracer.AddSphere(sphere5);
-	tracer.AddSphere(sphere6);
+// 	tracer.AddLight(light2);
+// 	tracer.AddSphere(sphere1);
+// 	tracer.AddSphere(sphere2);
+// 	tracer.AddSphere(sphere3);
+// 	tracer.AddSphere(sphere4);
+// 	tracer.AddSphere(sphere5);
+// 	tracer.AddSphere(sphere6);
+// 	tracer.AddSphere(sphere7);
+
+	float minRadius = 1.0f;
+	float maxRadius = 5.0f;
+	glm::vec3 maxSpherePos(80, 80, 5);
+	int sphereCount = 30;
+	for (int i_sphere = 0; i_sphere < sphereCount; i_sphere++)
+	{
+		glm::vec3 sphereCenter(RandomFloat(), RandomFloat(), RandomFloat());
+		sphereCenter *= maxSpherePos;
+		float sphereRad = RandomFloat() * (maxRadius - minRadius) + minRadius;
+		glm::vec4 sphereColor(RandomFloat(), RandomFloat(), RandomFloat(),1);
+		Sphere *newSphere = new Sphere(sphereRad, sphereCenter, sphereColor);
+		tracer.AddSphere(newSphere);
+	}
 
 	tracer.Update();
 
@@ -367,9 +393,9 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
 			continue;
 		}
 		d3dDeviceContext->UpdateSubresource(screenTexture, 0, nullptr, dstPointer, sizeof(unsigned char) * 4 * screenWidth, 0);
-// 		imguiHandler->StartNewFrame();
-// 		imguiHandler->Render();
-		renderer.Render(d3dDeviceContext, &tracer.octree, viewProj);
+ 		imguiHandler->StartNewFrame();
+ 		imguiHandler->Render();
+		//renderer.Render(d3dDeviceContext, &tracer.octree, viewProj);
 
 		d3dSwapChain->Present(0, 0);
 	}

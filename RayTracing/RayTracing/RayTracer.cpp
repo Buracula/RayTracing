@@ -2,7 +2,7 @@
 #include <assert.h>
 
 RayTracer::RayTracer()
-	:octree(3)
+	:octree(3, 4)
 {
 	mRenderTarget = nullptr;
 }
@@ -35,7 +35,7 @@ glm::vec4 RayTracer::Shade(const IntersectionPoint &intersectionPoint, const Ray
 
 		if(!InShadow(shadowRay, mLights[i]))
 		{
-			output = output + PhongIllumination(intersectionPoint, ray, mLights[i]);
+			output += PhongIllumination(intersectionPoint, ray, mLights[i]);
 		}
 	}
 
@@ -44,8 +44,8 @@ glm::vec4 RayTracer::Shade(const IntersectionPoint &intersectionPoint, const Ray
 
 void RayTracer::CalculateShadowRay(const IntersectionPoint &intersectionPoint, const Ray &ray, const Light &light, Ray &shadowRay)
 {
-	shadowRay.direction = glm::normalize(light.position - shadowRay.origin);
-	shadowRay.origin = intersectionPoint.position + glm::vec3(0.0001f) * shadowRay.direction;	
+	shadowRay.direction = glm::normalize(light.position - intersectionPoint.position);
+	shadowRay.origin = intersectionPoint.position + glm::vec3(0.005f) * intersectionPoint.normal;
 }
 
 bool RayTracer::InShadow(const Ray &shadowRay, const Light &light)
@@ -53,12 +53,9 @@ bool RayTracer::InShadow(const Ray &shadowRay, const Light &light)
 	IntersectionPoint intersectionPoint;
 	float maxT = glm::length(light.position - shadowRay.origin);
 	float intersectionT;
-	for (int i = 0; i < mSpheres.size(); i++)
+	if(FindClosestIntersection(shadowRay, intersectionPoint, intersectionT) && intersectionT < maxT)
 	{
-		if(FindClosestIntersection(shadowRay, intersectionPoint, intersectionT) && intersectionT < maxT)
-		{
-			return true;
-		}
+		return true;
 	}
 
 	return false;
@@ -85,7 +82,43 @@ glm::vec4 RayTracer::PhongIllumination(const IntersectionPoint &intersectionPoin
 bool RayTracer::FindClosestIntersection(const Ray &ray, IntersectionPoint &intersectionPoint, float& t)
 {
 #ifdef USE_OCTREE
-	return octree.FindClosestIntersection(ray, intersectionPoint, t);
+	float sceneT;
+	float groundT;
+	bool intersectionWithScene = octree.FindClosestIntersection(ray, intersectionPoint, sceneT);
+	bool intersectionWithGround = RayPlaneIntersection(glm::vec3(0, 0, -1), glm::vec3(0,0,-10), ray, groundT);
+	if (intersectionWithScene || intersectionWithGround)
+	{
+		if (intersectionWithScene && intersectionWithGround)
+		{
+			if (groundT < sceneT)
+			{
+				intersectionPoint.normal = glm::vec3(0, 0, 1);
+				intersectionPoint.position = ray.origin + ray.direction * groundT;
+				intersectionPoint.color = glm::vec4(0.6, 0.6, 0.6,1);
+				t = groundT;
+			}
+			else
+			{
+				t = sceneT;
+			}
+		}
+		else
+		{
+			if (intersectionWithScene)
+			{
+				t = sceneT;
+			}
+			else
+			{
+				intersectionPoint.normal = glm::vec3(0, 0, 1);
+				intersectionPoint.position = ray.origin + ray.direction * groundT;
+				intersectionPoint.color = glm::vec4(0.6, 0.6, 0.6, 1);
+				t = groundT;
+			}
+		}
+		return true;
+	}
+	return false;
 #else
 	float minT = FLT_MAX;
 	int minIndex = -1;
@@ -104,10 +137,10 @@ bool RayTracer::FindClosestIntersection(const Ray &ray, IntersectionPoint &inter
 
 	if(minIndex != -1)
 	{
+		t = minT;
 		intersectionPoint.position = ray.origin + ray.direction * t;
 		intersectionPoint.color = mSpheres[minIndex]->color;
 		intersectionPoint.normal = glm::normalize(intersectionPoint.position - mSpheres[minIndex]->center);
-		t = minT;
 		return true;
 	}
 	else
@@ -159,7 +192,7 @@ void RayTracer::Update()
 	{
 		for (int x = 0; x < mWidth; x++)
 		{
-			if(x == 754 && y == (279 - 34))
+			if(x == 1042 && y == (343 - 31))
 			{
 				int a = 5;
 			}

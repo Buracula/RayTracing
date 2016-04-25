@@ -4,19 +4,18 @@ void Octree::Build(const std::vector<Sphere*> &spheres)
 {
 	glm::vec3 minCoordinates, maxCoordinates;
 	FindBoundingBoxCoordinates(spheres, minCoordinates, maxCoordinates);
+	glm::vec3 sceneDimension = maxCoordinates - minCoordinates;
+	glm::vec3 octreeCenter = (maxCoordinates - minCoordinates) * 0.5f;
+	glm::vec3 octreeHalfDimension = glm::vec3(glm::max(glm::max(sceneDimension.x, sceneDimension.y), sceneDimension.z));
 
-	std::vector<Sphere*> nodeSpheres;
-	for (int i = 0; i < spheres.size(); i++)
-	{
-		nodeSpheres.push_back(spheres[i]);
-	}
-
-	root = new OctreeNode(minCoordinates, maxCoordinates, nodeSpheres , false);
-	BuildChilds(root);
+	minCoordinates = octreeCenter - octreeHalfDimension;
+	maxCoordinates = octreeCenter + octreeHalfDimension;
+	root = new OctreeNode(minCoordinates, maxCoordinates, spheres, false);
+	BuildChilds(root, 0);
 }
 
 
-void Octree::BuildChilds(OctreeNode *node)
+void Octree::BuildChilds(OctreeNode *node, int currentLevel)
 {
 	glm::vec3 parentDim = node->maxCoordinates - node->minCoordinates;
 
@@ -26,84 +25,74 @@ void Octree::BuildChilds(OctreeNode *node)
 	maxCoordinates1.x += parentDim.x / 2;
 	maxCoordinates1.y += parentDim.y / 2;
 	maxCoordinates1.z += parentDim.z / 2;
-	CreateChild(node, minCoordinates1, maxCoordinates1);
+	CreateChild(node, minCoordinates1, maxCoordinates1, currentLevel);
 
 	glm::vec3 minCoordinates2, maxCoordinates2;
-	minCoordinates2 = node->minCoordinates;
-	maxCoordinates2 = node->minCoordinates;
+	minCoordinates2 = minCoordinates1;
+	maxCoordinates2 = maxCoordinates1;
 	minCoordinates2.x += parentDim.x / 2;
-	maxCoordinates2.y += parentDim.y / 2;
-	maxCoordinates2.z += parentDim.z / 2;
-	CreateChild(node, minCoordinates2, maxCoordinates2);
+	maxCoordinates2.x += parentDim.x / 2;
+	CreateChild(node, minCoordinates2, maxCoordinates2, currentLevel);
 
 	glm::vec3 minCoordinates3, maxCoordinates3;
-	minCoordinates3 = node->minCoordinates;
-	maxCoordinates3 = node->minCoordinates;
+	minCoordinates3 = minCoordinates1;
+	maxCoordinates3 = maxCoordinates1;
 	minCoordinates3.y += parentDim.y / 2;
-	maxCoordinates3.y =  node->maxCoordinates.y;
-	maxCoordinates3.x += parentDim.x / 2;
-	maxCoordinates3.z += parentDim.z / 2;
-	CreateChild(node, minCoordinates3, maxCoordinates3);
+	maxCoordinates3.y += parentDim.y / 2;
+	CreateChild(node, minCoordinates3, maxCoordinates3, currentLevel);
 
 	glm::vec3 minCoordinates4, maxCoordinates4;
-	minCoordinates4 = node->minCoordinates;
-	maxCoordinates4 = node->minCoordinates;
+	minCoordinates4 = minCoordinates1;
+	maxCoordinates4 = maxCoordinates1;
 	minCoordinates4.x += parentDim.x / 2;
+	maxCoordinates4.x += parentDim.x / 2;
 	minCoordinates4.y += parentDim.y / 2;
-	maxCoordinates4.x = node->maxCoordinates.x;
-	maxCoordinates4.y = node->maxCoordinates.y;
-	maxCoordinates4.z += parentDim.z / 2;
-	CreateChild(node, minCoordinates4, maxCoordinates4);
-
+	maxCoordinates4.y += parentDim.y / 2;
+	CreateChild(node, minCoordinates4, maxCoordinates4, currentLevel);
+	//////////////////////////////////////////////////////////////////////////
 	glm::vec3 minCoordinates5, maxCoordinates5;
-	minCoordinates5 = node->minCoordinates;
-	maxCoordinates5 = node->minCoordinates;
+	minCoordinates5 = minCoordinates1;
+	maxCoordinates5 = maxCoordinates1;
 	minCoordinates5.z += parentDim.z / 2;
-	maxCoordinates5.x += parentDim.x / 2;
-	maxCoordinates5.y += parentDim.y / 2;
-	maxCoordinates5.z =  node->maxCoordinates.z;
-	CreateChild(node, minCoordinates5, maxCoordinates5);
+	maxCoordinates5.z += parentDim.z / 2;
+	CreateChild(node, minCoordinates5, maxCoordinates5, currentLevel);
 
 	glm::vec3 minCoordinates6, maxCoordinates6;
-	minCoordinates6 = node->minCoordinates;
-	maxCoordinates6 = node->minCoordinates;
+	minCoordinates6 = minCoordinates5;
+	maxCoordinates6 = maxCoordinates5;
 	minCoordinates6.x += parentDim.x / 2;
-	minCoordinates6.z += parentDim.z / 2;
-	maxCoordinates6.x = node->maxCoordinates.x;
-	maxCoordinates6.y += parentDim.y / 2;
-	maxCoordinates6.z = node->maxCoordinates.z;
-	CreateChild(node, minCoordinates6, maxCoordinates6);
+	maxCoordinates6.x += parentDim.x / 2;
+	CreateChild(node, minCoordinates6, maxCoordinates6, currentLevel);
 
 	glm::vec3 minCoordinates7, maxCoordinates7;
-	minCoordinates7 = node->minCoordinates;
-	maxCoordinates7 = node->minCoordinates;
+	minCoordinates7 = minCoordinates5;
+	maxCoordinates7 = maxCoordinates5;
 	minCoordinates7.y += parentDim.y / 2;
-	minCoordinates7.z += parentDim.z / 2;;
-	maxCoordinates7.y = node->maxCoordinates.y;
-	maxCoordinates7.x += parentDim.x / 2;
-	maxCoordinates7.z = node->maxCoordinates.z;
-	CreateChild(node, minCoordinates7, maxCoordinates7);
+	maxCoordinates7.y += parentDim.y / 2;
+	CreateChild(node, minCoordinates7, maxCoordinates7, currentLevel);
 
 	glm::vec3 minCoordinates8, maxCoordinates8;
-	minCoordinates8 = node->minCoordinates;
-	maxCoordinates8 = node->maxCoordinates;
+	minCoordinates8 = minCoordinates5;
+	maxCoordinates8 = maxCoordinates5;
 	minCoordinates8.x += parentDim.x / 2;
+	maxCoordinates8.x += parentDim.x / 2;
 	minCoordinates8.y += parentDim.y / 2;
-	minCoordinates8.z += parentDim.z / 2;
-	CreateChild(node, minCoordinates8, maxCoordinates8);
+	maxCoordinates8.y += parentDim.y / 2;
+	CreateChild(node, minCoordinates8, maxCoordinates8, currentLevel);
 	
 	node->spheres.clear();
 }
 
-void Octree::CreateChild(OctreeNode *node, glm::vec3 &minCoordinates, glm::vec3 &maxCoordinates)
+void Octree::CreateChild(OctreeNode *node, glm::vec3 &minCoordinates, glm::vec3 &maxCoordinates, int currentLevel)
 {
 	std::vector<Sphere*> childSpheres;
 	FindChildSpheres(node->spheres, childSpheres, minCoordinates, maxCoordinates);
-	OctreeNode* child = new OctreeNode(minCoordinates, maxCoordinates, childSpheres, childSpheres.size() <= maxPrimitivePerLeaf);
+	bool isLeaf = childSpheres.size() <= maxPrimitivePerLeaf || currentLevel >= maxLevel;
+	OctreeNode* child = new OctreeNode(minCoordinates, maxCoordinates, childSpheres, isLeaf);
 	node->AddChild(*child);
 	if(!child->isLeafNode)
 	{
-		BuildChilds(child);
+		BuildChilds(child, currentLevel + 1);
 	}
 }
 
