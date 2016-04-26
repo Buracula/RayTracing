@@ -6,11 +6,13 @@
 struct Sphere
 {
 	glm::vec3 center;
-	glm::vec4 color;
 	float radius;
+	glm::vec4 color;
 
 	glm::vec3 boundingBoxMin;
+	float padding1;
 	glm::vec3 boundingBoxMax;
+	float padding2;
 
 	Sphere()
 	{

@@ -1,5 +1,5 @@
 #include "RayTracer.h"
-#include <assert.h>
+//#include <assert.h>
 
 RayTracer::RayTracer()
 	:octree(3, 4)
@@ -20,7 +20,6 @@ void RayTracer::Trace(const Ray &ray, glm::vec4 &outputColor)
 	{
 		outputColor = glm::vec4(glm::vec3(0.5), 1.0f);
 	}
-
 }
 
 glm::vec4 RayTracer::Shade(const IntersectionPoint &intersectionPoint, const Ray &ray)
@@ -157,7 +156,7 @@ void RayTracer::SetCameraParams(const glm::vec3 camPos, const glm::vec3 lookAt, 
 	mAspectRatio = (float)width / height;
 	mVerticalFov = verticalFov;
 	glm::vec3 camDir = lookAt - mCameraPos;
-	assert(glm::length(camDir) != 0);
+	//assert(glm::length(camDir) != 0);
 	mCameraDir = glm::normalize(camDir);
 	glm::vec3 upDirNormalized = glm::normalize(upDir);
 	float nearPlaneHalfHeight = glm::tan(glm::radians(verticalFov));
@@ -182,7 +181,7 @@ void RayTracer::SetCameraParams(const glm::vec3 camPos, const glm::vec3 lookAt, 
 void RayTracer::Update()
 {
 	octree.Build(mSpheres);
-
+	return;
 	glm::vec2 dimension(mWidth, mHeight);
 	glm::vec2 _2(2.0f);
 	glm::vec2 minus1(-1.0f);
@@ -217,6 +216,130 @@ void RayTracer::Update()
 	}
 }
 
+struct ConstantBuffer
+{
+	glm::vec3 nearPlaneUp;
+	float width;
+	glm::vec3 nearPlaneSide;
+	float height;
+
+	glm::vec3 nearPlaneCenter;
+	int sphereCount;
+
+	glm::vec3 mCameraPos;
+	int lightCount;
+
+
+};
+
+void RayTracer::CreateGpuBuffers(
+	ID3D11Device *device, 
+	ID3D11ShaderResourceView **octreeBufferSRV, 
+	ID3D11ShaderResourceView **lightBufferSRV, 
+	ID3D11ShaderResourceView **sphereBufferSRV,
+	ID3D11Buffer **constantBuffer
+	)
+{
+
+	{
+		OctreeNodeGPU *gpuNodes = new OctreeNodeGPU[octree.nodesLength];
+		for (int i_node = 0; i_node < octree.nodesLength; i_node++)
+		{
+			gpuNodes[i_node].boxMax = octree.nodes[i_node].maxCoordinates;
+			gpuNodes[i_node].boxMin = octree.nodes[i_node].minCoordinates;
+			gpuNodes[i_node].isLeaf = octree.nodes[i_node].isLeafNode;
+			if (!gpuNodes[i_node].isLeaf)
+			{
+				for (int i_child = 0; i_child < 8; i_child++)
+				{
+					gpuNodes[i_node].childIndices[i_child] = octree.nodes[i_node].childNodes[i_child] - octree.nodes;
+				}
+			}
+		}
+		D3D11_BUFFER_DESC bd;
+		memset(&bd, 0x00, sizeof(D3D11_BUFFER_DESC));
+		bd.BindFlags = D3D11_BIND_SHADER_RESOURCE;
+		bd.ByteWidth = sizeof(OctreeNodeGPU) * octree.nodesLength;
+		bd.MiscFlags = D3D11_RESOURCE_MISC_BUFFER_STRUCTURED;
+		bd.Usage = D3D11_USAGE_IMMUTABLE;
+		bd.StructureByteStride = sizeof(OctreeNodeGPU);
+
+		D3D11_SUBRESOURCE_DATA srd;
+		srd.pSysMem = gpuNodes;
+		srd.SysMemPitch = 0;
+		srd.SysMemSlicePitch = 0;
+		ID3D11Buffer *octreeBuffer;
+		device->CreateBuffer(&bd, &srd, &octreeBuffer);
+		device->CreateShaderResourceView(octreeBuffer, nullptr, octreeBufferSRV);
+		octreeBuffer->Release();
+	}
+	{
+		D3D11_BUFFER_DESC bd;
+		memset(&bd, 0x00, sizeof(D3D11_BUFFER_DESC));
+		bd.BindFlags = D3D11_BIND_SHADER_RESOURCE;
+		bd.ByteWidth = sizeof(Light) * mLights.size();
+		bd.MiscFlags = D3D11_RESOURCE_MISC_BUFFER_STRUCTURED;
+		bd.Usage = D3D11_USAGE_IMMUTABLE;
+		bd.StructureByteStride = sizeof(Light);
+
+		D3D11_SUBRESOURCE_DATA srd;
+		srd.pSysMem = &mLights[0];
+		srd.SysMemPitch = 0;
+		srd.SysMemSlicePitch = 0;
+		ID3D11Buffer *lightBuffer;
+		device->CreateBuffer(&bd, &srd, &lightBuffer);
+		device->CreateShaderResourceView(lightBuffer, nullptr, lightBufferSRV);
+		lightBuffer->Release();
+	}
+	{
+		D3D11_BUFFER_DESC bd;
+		memset(&bd, 0x00, sizeof(D3D11_BUFFER_DESC));
+		bd.BindFlags = D3D11_BIND_SHADER_RESOURCE;
+		bd.ByteWidth = sizeof(Sphere) * mSpheres.size();
+		bd.MiscFlags = D3D11_RESOURCE_MISC_BUFFER_STRUCTURED;
+		bd.Usage = D3D11_USAGE_IMMUTABLE;
+		bd.StructureByteStride = sizeof(Sphere);
+
+		Sphere *sphereBufferCPU = new Sphere[mSpheres.size()];
+		for (int i = 0; i < mSpheres.size(); i++)
+		{
+			sphereBufferCPU[i] = *mSpheres[i];
+		}
+
+		D3D11_SUBRESOURCE_DATA srd;
+		srd.pSysMem = sphereBufferCPU;
+		srd.SysMemPitch = 0;
+		srd.SysMemSlicePitch = 0;
+		ID3D11Buffer *sphereBuffer;
+		device->CreateBuffer(&bd, &srd, &sphereBuffer);
+		device->CreateShaderResourceView(sphereBuffer, nullptr, sphereBufferSRV);
+		sphereBuffer->Release();
+		delete []sphereBufferCPU;
+	}
+	{
+		ConstantBuffer cb;
+		cb.height = mHeight;
+		cb.mCameraPos = mCameraPos;
+		cb.nearPlaneCenter = mCameraPos + mCameraDir;
+		cb.nearPlaneSide = mNearPlaneSide;
+		cb.nearPlaneUp = mNearPlaneUp;
+		cb.width = mWidth;
+		cb.sphereCount = mSpheres.size();
+		cb.lightCount = mLights.size();
+
+		D3D11_BUFFER_DESC bd;
+		memset(&bd, 0x00, sizeof(D3D11_BUFFER_DESC));
+		bd.BindFlags = D3D11_BIND_CONSTANT_BUFFER;
+		bd.ByteWidth = sizeof(ConstantBuffer);
+		bd.MiscFlags = 0;
+		bd.Usage = D3D11_USAGE_IMMUTABLE;
+		D3D11_SUBRESOURCE_DATA srd;
+		srd.pSysMem = &cb;
+		srd.SysMemPitch = 0;
+		srd.SysMemSlicePitch = 0;
+		device->CreateBuffer(&bd, &srd, constantBuffer);
+	}
+}
 
 
 

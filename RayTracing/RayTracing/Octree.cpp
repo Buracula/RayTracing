@@ -10,13 +10,17 @@ void Octree::Build(const std::vector<Sphere*> &spheres)
 
 	minCoordinates = octreeCenter - octreeHalfDimension;
 	maxCoordinates = octreeCenter + octreeHalfDimension;
-	root = new OctreeNode(minCoordinates, maxCoordinates, spheres, false);
+	//root = new OctreeNode(minCoordinates, maxCoordinates, spheres, false);
+	root = GetNewNode(minCoordinates, maxCoordinates, spheres, false);
+	
 	BuildChilds(root, 0);
 }
 
-
 void Octree::BuildChilds(OctreeNode *node, int currentLevel)
 {
+	node->childCount = 0;
+	node->childNodes = new OctreeNode*[8];
+
 	glm::vec3 parentDim = node->maxCoordinates - node->minCoordinates;
 
 	glm::vec3 minCoordinates1, maxCoordinates1;
@@ -88,8 +92,9 @@ void Octree::CreateChild(OctreeNode *node, glm::vec3 &minCoordinates, glm::vec3 
 	std::vector<Sphere*> childSpheres;
 	FindChildSpheres(node->spheres, childSpheres, minCoordinates, maxCoordinates);
 	bool isLeaf = childSpheres.size() <= maxPrimitivePerLeaf || currentLevel >= maxLevel;
-	OctreeNode* child = new OctreeNode(minCoordinates, maxCoordinates, childSpheres, isLeaf);
-	node->AddChild(*child);
+	//OctreeNode* child = new OctreeNode(minCoordinates, maxCoordinates, childSpheres, isLeaf);
+	OctreeNode* child = GetNewNode(minCoordinates, maxCoordinates, childSpheres, isLeaf);
+	node->AddChild(child);
 	if(!child->isLeafNode)
 	{
 		BuildChilds(child, currentLevel + 1);

@@ -23,8 +23,8 @@ ImguiHandler::ImguiHandler(ID3D11DeviceContext *d3dDeviceContext, ID3D11Device *
 	rebuildRequested = true;
 	sphereCount = 3;
 	sphereOverlap = true;
-	minSphereRadiuses = 1;
-	maxSphereRadiuses = 5;
+	minSphereRadiuses = 2;
+	maxSphereRadiuses = 2;
 }
 
 void ImguiHandler::Init()

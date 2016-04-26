@@ -10,7 +10,7 @@
 #include "RayTracer.h"
 #include "Octree.h"
 
-#define SAFE_RELEASE(x) if((x)){(x)->Release();}
+#define SAFE_RELEASE(x) if((x)){(x)->Release();(x) = nullptr;}
 
 class Octree_renderer
 {
@@ -98,7 +98,7 @@ class Octree_renderer
 		{
 			for (int i_child = 0; i_child < 8; i_child++)
 			{
-				RenderNode(d3dDeviceContext, &node->childNodes[i_child]);
+				RenderNode(d3dDeviceContext, node->childNodes[i_child]);
 			}
 		}		
 	}
@@ -280,7 +280,7 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
 	ID3D11DeviceContext *d3dDeviceContext = nullptr;
 	IDXGISwapChain *d3dSwapChain = nullptr;
 #ifdef _DEBUG
-	unsigned int deviceFlag = 0;
+	unsigned int deviceFlag = D3D11_CREATE_DEVICE_DEBUG;
 #else
 	unsigned int deviceFlag = 0;
 #endif
@@ -289,23 +289,24 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
 	DXGI_SWAP_CHAIN_DESC scd;
 	ZeroMemory(&scd, sizeof(DXGI_SWAP_CHAIN_DESC));
 	scd.BufferCount = 1;
-	scd.BufferDesc.Format = DXGI_FORMAT_R8G8B8A8_UNORM_SRGB;
+	scd.BufferDesc.Format = DXGI_FORMAT_R8G8B8A8_UNORM;
 	scd.BufferDesc.Height = screenHeight;
 	scd.BufferDesc.Width = screenWidth;
 	scd.BufferDesc.RefreshRate.Numerator = 60;
 	scd.BufferDesc.RefreshRate.Denominator = 1;
-	scd.BufferUsage = DXGI_USAGE_RENDER_TARGET_OUTPUT;
+	scd.BufferUsage = DXGI_USAGE_RENDER_TARGET_OUTPUT|DXGI_USAGE_UNORDERED_ACCESS;
 	scd.OutputWindow = windowHandle;
 	scd.SampleDesc.Count = 1;
 	scd.Windowed = TRUE;
 	D3D_FEATURE_LEVEL outLevel;
 	D3D11CreateDeviceAndSwapChain(nullptr, D3D_DRIVER_TYPE_HARDWARE, 0, deviceFlag, &levels, 1, D3D11_SDK_VERSION,
 		&scd, &d3dSwapChain, &d3dDevice, &outLevel, &d3dDeviceContext);
-
 	ID3D11Texture2D *screenTexture;
 	ID3D11RenderTargetView *screenTextureRTV;
+	ID3D11UnorderedAccessView *screenTextureUAV;
 	d3dSwapChain->GetBuffer(0, __uuidof(ID3D11Texture2D), (void**)&screenTexture);
 	d3dDevice->CreateRenderTargetView(screenTexture, nullptr, &screenTextureRTV);
+	d3dDevice->CreateUnorderedAccessView(screenTexture, nullptr, &screenTextureUAV);
 	d3dDeviceContext->OMSetRenderTargets(1, &screenTextureRTV, nullptr);
 	//////////////////////////////////////////////////////////////////////////
 	//UI
@@ -326,6 +327,24 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
 	const float *srcPtr = tracer.GetRenderTargetBuffer();
 	unsigned char *dstPointer = new unsigned char[pixelCount * 4];
 
+	ID3D11ComputeShader *computeShader;
+	{
+		ID3DBlob *compiledBlod;
+		ID3DBlob *errorMessage;
+		D3DCompileFromFile(L"ComputeShader.compute", nullptr, nullptr, "main", "cs_5_0", 0, 0, &compiledBlod, &errorMessage);
+		if (errorMessage)
+		{
+			const char *asd = (const char *)errorMessage->GetBufferPointer();
+			__debugbreak();
+		}
+		d3dDevice->CreateComputeShader(compiledBlod->GetBufferPointer(), compiledBlod->GetBufferSize(), nullptr, &computeShader);
+	}
+
+	ID3D11ShaderResourceView *lightBufferSRV = nullptr;
+	ID3D11ShaderResourceView *sphereBufferSRV = nullptr;
+	ID3D11ShaderResourceView *octreeBufferSRV = nullptr;
+	ID3D11Buffer *constantBufffer = nullptr;
+
 	Octree_renderer renderer(d3dDevice, screenWidth, screenHeight);
 	glm::mat4x4 viewMatrix = glm::lookAtRH(camPos, targetPos, camUp);
 	glm::mat4x4 projMatrix = glm::perspectiveRH(glm::radians(verticalFov*2), (float)screenWidth /(float)screenHeight, 0.01f, 1000.0f);
@@ -337,9 +356,13 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
 		if (imguiHandler->rebuildRequested)
 		{
 			tracer.Clear();
+			SAFE_RELEASE(lightBufferSRV);
+			SAFE_RELEASE(sphereBufferSRV);
+			SAFE_RELEASE(octreeBufferSRV);
+			SAFE_RELEASE(constantBufffer);
 			float minRadius = imguiHandler->minSphereRadiuses;
 			float maxRadius = imguiHandler->maxSphereRadiuses;
-			glm::vec3 maxSpherePos(200, 200, 5);
+			glm::vec3 maxSpherePos(20, 20, 5);
 			int sphereCount = imguiHandler->sphereCount;
 			for (int i_sphere = 0; i_sphere < sphereCount; i_sphere++)
 			{
@@ -387,6 +410,20 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
 
 			tracer.AddLight(light1);
 			tracer.Update();
+			tracer.CreateGpuBuffers(d3dDevice, &octreeBufferSRV, &lightBufferSRV, &sphereBufferSRV, &constantBufffer);
+			
+			ID3D11RenderTargetView *nullRTV = nullptr;
+			d3dDeviceContext->OMSetRenderTargets(1, &nullRTV, nullptr);
+
+			d3dDeviceContext->CSSetShader(computeShader, nullptr, 0);
+			d3dDeviceContext->CSSetUnorderedAccessViews(0, 1, &screenTextureUAV, nullptr);
+			d3dDeviceContext->CSSetShaderResources(0, 1, &sphereBufferSRV);
+			d3dDeviceContext->CSSetShaderResources(1, 1, &lightBufferSRV);
+			d3dDeviceContext->CSSetShaderResources(2, 1, &octreeBufferSRV);
+			d3dDeviceContext->CSSetConstantBuffers(0, 1, &constantBufffer);
+			d3dDeviceContext->Dispatch(screenWidth / 16, screenHeight / 16, 1);
+
+			//renderer.Render(d3dDeviceContext, &tracer.octree, viewProj);
 
 			for (int i_pixel = 0; i_pixel < pixelCount; i_pixel++)
 			{
@@ -406,10 +443,9 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
 			DispatchMessage(&msg);
 			continue;
 		}
-		d3dDeviceContext->UpdateSubresource(screenTexture, 0, nullptr, dstPointer, sizeof(unsigned char) * 4 * screenWidth, 0);
+		//d3dDeviceContext->UpdateSubresource(screenTexture, 0, nullptr, dstPointer, sizeof(unsigned char) * 4 * screenWidth, 0);
  		imguiHandler->StartNewFrame();
  		imguiHandler->Render();
-		//renderer.Render(d3dDeviceContext, &tracer.octree, viewProj);
 
 		d3dSwapChain->Present(0, 0);
 	}

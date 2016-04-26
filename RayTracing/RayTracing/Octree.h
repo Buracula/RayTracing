@@ -1,4 +1,5 @@
 #pragma once
+
 #include <algorithm>
 #include <glm\glm.hpp>
 #include "Sphere.h"
@@ -20,6 +21,8 @@ struct IntersectionPoint
 struct Light
 {
 	glm::vec3 position;
+	float padding;
+
 	glm::vec4 color;
 
 	Light()
@@ -75,56 +78,7 @@ __inline bool RaySphereIntersection(const Sphere &sphere, const Ray &ray, float 
 		{
 			t = minRoot;
 			return true;
-		}
-
-		// 		if(t1 < t2)
-		// 		{
-		// 			if(t1 < 0)
-		// 			{
-		// 				if(t2 < 0)
-		// 				{
-		// 					return false;
-		// 				}
-		// 				else
-		// 				{
-		// 					t = t2;
-		// 					return true;
-		// 				}
-		// 			}
-		// 			else
-		// 			{
-		// 				t = t1;
-		// 				return true;
-		// 			}
-		// 		}
-		// 		else
-		// 		{
-		// 			if(t2 < 0)
-		// 			{
-		// 				if(t1 < 0)
-		// 				{
-		// 					if (t2 < 0)
-		// 					{
-		// 						return false;
-		// 					}
-		// 					else
-		// 					{
-		// 						t = t2;
-		// 						return true;
-		// 					}
-		// 				}
-		// 				else
-		// 				{
-		// 					t = t1;
-		// 					return true;
-		// 				}
-		// 			}
-		// 			else
-		// 			{
-		// 				t = t2;
-		// 				return true;
-		// 			}
-		// 		}
+		}	
 	}
 }
 
@@ -148,7 +102,7 @@ struct OctreeNode
 	glm::vec3 maxCoordinates;
 
 	std::vector<Sphere*> spheres;
-	OctreeNode* childNodes;
+	OctreeNode** childNodes;
 
 
 	OctreeNode(glm::vec3 &minCoordinates, glm::vec3 &maxCoordinates,const std::vector<Sphere*> &spheres, bool isLeafNode)
@@ -159,7 +113,7 @@ struct OctreeNode
 		this->spheres = spheres;
 
 		this->childCount = 0;
-		childNodes = new OctreeNode[8];
+		childNodes = NULL;
 	}
 
 	~OctreeNode()
@@ -167,19 +121,31 @@ struct OctreeNode
 		delete []childNodes;
 	}
 
-	void AddChild(OctreeNode &node)
+	void AddChild(OctreeNode *node)
 	{
 		childNodes[childCount] = node;
 		childCount++;
 	}
-
-private:
-	int childCount;
 	OctreeNode()
 	{
 		childCount = 0;
 		childNodes = nullptr;
 	}
+
+	int childCount;
+private:
+	
+};
+
+struct OctreeNodeGPU
+{
+	glm::vec3 boxMin;
+	int isLeaf;
+
+	glm::vec3 boxMax;
+	float padding;
+	 
+	int childIndices[8];
 };
 
 struct ChildPoint
@@ -195,6 +161,10 @@ __inline bool ChildPointComparisonFunc(const ChildPoint &a, const ChildPoint &b)
 
 class Octree
 {
+public:
+	OctreeNode *nodes;
+	int nodesLength;
+private:
 	int maxPrimitivePerLeaf;
 	int maxLevel;
 	OctreeNode *root;
@@ -208,7 +178,8 @@ class Octree
 	{
 		float tmin = -FLT_MAX, tmax = FLT_MAX;
 
-		if (ray.direction.x != 0.0) {
+		if (ray.direction.x != 0.0) 
+		{
 			float tx1 = (boxMin.x - ray.origin.x) / ray.direction.x;
 			float tx2 = (boxMax.x - ray.origin.x) / ray.direction.x;
 
@@ -273,7 +244,7 @@ class Octree
 			for (int i = 0; i < 8; i++)
 			{
 				float intT;
-				if(CheckRayBoxIntersection(ray, node->childNodes[i].minCoordinates, node->childNodes[i].maxCoordinates, intT))
+				if(CheckRayBoxIntersection(ray, node->childNodes[i]->minCoordinates, node->childNodes[i]->maxCoordinates, intT))
 				{
 					indexDistancePairs[foundIntersection].point = intT;
 					indexDistancePairs[foundIntersection].childIndex = i;
@@ -288,7 +259,7 @@ class Octree
 			for (int i = 0; i < foundIntersection; i++)
 			{
 				const ChildPoint &curNodeInfo = indexDistancePairs[i];
-				if(FindClosestIntersectionOfNode(&node->childNodes[curNodeInfo.childIndex], ray, intersectionPoint, t))
+				if(FindClosestIntersectionOfNode(node->childNodes[curNodeInfo.childIndex], ray, intersectionPoint, t))
 				{
 					return true;
 				}
@@ -303,6 +274,8 @@ public:
 		this->maxPrimitivePerLeaf = maxPrimitivePerLeaf;
 		this->maxLevel = maxLevel;
 		root = nullptr;
+		nodes = new OctreeNode[35000];
+		nodesLength = 0;
 	}
 	OctreeNode *GetRootNode()
 	{
@@ -313,9 +286,17 @@ public:
 	{
 		return FindClosestIntersectionOfNode(root, ray, intersectionPoint, t);
 	}
-
+	OctreeNode* GetNewNode(glm::vec3 &minCoordinates, glm::vec3 &maxCoordinates, const std::vector<Sphere*> &spheres, bool isLeafNode)
+	{
+		nodesLength++;
+		nodes[nodesLength - 1].minCoordinates = minCoordinates;
+		nodes[nodesLength - 1].maxCoordinates = maxCoordinates;
+		nodes[nodesLength - 1].isLeafNode = isLeafNode;
+		nodes[nodesLength - 1].spheres = spheres;
+		return &nodes[nodesLength - 1];
+	}
 	void Clear()
 	{
-		delete root;
+		nodesLength = 0;
 	}
 };

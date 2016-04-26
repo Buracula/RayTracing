@@ -2,6 +2,7 @@
 
 #define USE_OCTREE
 
+#include <d3d11.h>
 #include <glm\glm.hpp>
 #include <vector>
 #include "Sphere.h"
@@ -60,4 +61,7 @@ public:
 		mSpheres.clear();
 		mLights.clear();
 	}
+
+	void CreateGpuBuffers(ID3D11Device *device, ID3D11ShaderResourceView **octreeBufferSRV, ID3D11ShaderResourceView **lightBufferSRV, ID3D11ShaderResourceView **sphereBufferSRV,
+		ID3D11Buffer **constantBuffer);
 };

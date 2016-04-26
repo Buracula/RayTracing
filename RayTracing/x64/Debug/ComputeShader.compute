@@ -1,0 +1,224 @@
+RWTexture2D<float4> renderTarget : register(u0);
+
+cbuffer GlobalVars : register(b0)
+{
+	float3 nearPlaneUp;
+	float width;
+	float3 nearPlaneSide;
+	float height;
+
+	float3 nearPlaneCenter;
+	int sphereCount;
+
+	float3 mCameraPos;
+	int lightCount;	
+};
+
+struct Sphere
+{
+	float3 center;
+	float radius;
+	float4 color;
+
+	float3 boundingBoxMin;
+	float padding1;
+	float3 boundingBoxMax;
+	float padding2;
+};
+
+struct OctreeNodeGPU
+{
+	float3 boxMin;
+	int isLeaf;
+
+	float3 boxMax;
+	float padding;
+
+	int4 childIndices[2];
+};
+
+struct Light
+{
+	float3 position;
+	float padding;
+
+	float4 color;
+};
+
+struct Ray
+{
+	float3 origin;
+	float3 direction;
+};
+
+struct IntersectionPoint
+{
+	float3 position;
+	float3 normal;
+	float4 color;
+};
+
+StructuredBuffer<Sphere> spheres : register(t0);
+StructuredBuffer<Light> lights : register(t1);
+StructuredBuffer<OctreeNodeGPU> octree : register(t2);
+
+float4 PhongIllumination(const IntersectionPoint intersectionPoint, const Ray ray, const Light light)
+{
+	float specularPower = 40.0f;
+	float4 totalColor;
+	const float3 surfaceNormal = intersectionPoint.normal;
+	float3 surfaceToLight = light.position - intersectionPoint.position;
+	float3 viewDir = normalize(intersectionPoint.position - mCameraPos);
+	float surfaceToLightLen = length(surfaceToLight);
+	surfaceToLight /= surfaceToLightLen;
+	float NoL = saturate(dot(surfaceNormal, surfaceToLight));
+
+	totalColor = intersectionPoint.color * light.color * NoL / (surfaceToLightLen * surfaceToLightLen);
+	float3 h = normalize(surfaceToLight + viewDir);
+	float NoH = saturate(dot(surfaceNormal, h));
+	totalColor += pow(NoH, specularPower) * intersectionPoint.color * light.color / (surfaceToLightLen * surfaceToLightLen);
+	return totalColor;
+}
+
+float4 Shade(const IntersectionPoint intersectionPoint, const Ray ray)
+{
+	float4 output = 0;
+	//TODO ambient?
+	Ray shadowRay;
+
+	for (int i = 0; i < lightCount; i++)
+	{
+		//CalculateShadowRay(intersectionPoint, ray, mLights[i], shadowRay);
+
+		//if (!InShadow(shadowRay, mLights[i]))
+		{
+			output += PhongIllumination(intersectionPoint, ray, lights[i]);
+		}
+	}
+
+	return output;
+}
+
+bool RaySphereIntersection(Sphere sphere, const Ray ray,out float t)
+{
+	float3 o_c = ray.origin - sphere.center;
+	float dDotD = dot(ray.direction, ray.direction);
+
+	float delta = pow(dot(ray.direction, (o_c)), 2)
+		- dDotD *(dot(o_c, o_c) - pow(sphere.radius, 2));
+
+	if (delta < 0)
+	{
+		return false;
+	}
+	else
+	{
+		float t1 = (-dot(ray.direction, o_c) + sqrt(delta)) / dDotD;
+		float t2 = (-dot(ray.direction, o_c) - sqrt(delta)) / dDotD;
+
+		float minRoot;
+		float maxRoot;
+		if (t1 > t2)
+		{
+			minRoot = t2;
+			maxRoot = t1;
+		}
+		else
+		{
+			minRoot = t2;
+			maxRoot = t1;
+		}
+
+		if (minRoot < 0)
+		{
+			if (maxRoot < 0)
+			{
+				return false;
+			}
+			else
+			{
+				t = maxRoot;
+				return true;
+			}
+		}
+		else
+		{
+			t = minRoot;
+			return true;
+		}
+	}
+}
+
+bool FindClosestIntersection(Ray ray, out IntersectionPoint intersectionPoint, out float t)
+{
+	float minT = 5873200;
+	int minIndex = -1;
+
+	for (int i = 0; i < sphereCount; i++)
+	{
+		if (RaySphereIntersection(spheres[i], ray, t))
+		{
+			if (t < minT)
+			{
+				minIndex = i;
+				minT = t;
+			}
+		}
+	}
+
+	float sceneT;
+
+
+	if (minIndex != -1)
+	{
+		t = minT;
+		intersectionPoint.position = ray.origin + ray.direction * t;
+		intersectionPoint.color = spheres[minIndex].color;
+		intersectionPoint.normal = normalize(intersectionPoint.position - spheres[minIndex].center);
+		return true;
+	}
+	else
+	{
+		intersectionPoint.position = 0;
+		intersectionPoint.color = 0;
+		intersectionPoint.normal = 0;
+		return false;
+	}
+
+	
+}
+
+
+void Trace(Ray ray, out float4 outputColor)
+{
+	IntersectionPoint intersectionPoint;
+	float t;
+	if (FindClosestIntersection(ray, intersectionPoint, t))
+	{
+		outputColor = Shade(intersectionPoint, ray);
+	}
+	else
+	{
+		outputColor = float4(0.5, 0.5, 0.5, 1);
+	}
+}
+
+[numthreads(16,16,1)]
+void main(uint3 threadId : SV_DispatchThreadID)
+{
+	float2 ssPos = float2(threadId.xy);
+	float2 dimension = float2(width, height);
+	ssPos = ssPos / dimension;
+	ssPos = ssPos * 2 - 1;
+
+	float3 pixelWorldPos = nearPlaneCenter + nearPlaneUp * -ssPos.y + nearPlaneSide * ssPos.x;
+	float3 rayDir = normalize(pixelWorldPos - mCameraPos);
+	Ray ray;
+	ray.direction = rayDir;
+	ray.origin = mCameraPos;
+	float4 oc;
+	Trace(ray, oc);
+
+	renderTarget[uint2(threadId.x, threadId.y)] = oc;
+}
+
