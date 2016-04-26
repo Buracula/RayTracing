@@ -181,7 +181,6 @@ void RayTracer::SetCameraParams(const glm::vec3 camPos, const glm::vec3 lookAt, 
 void RayTracer::Update()
 {
 	octree.Build(mSpheres);
-	return;
 	glm::vec2 dimension(mWidth, mHeight);
 	glm::vec2 _2(2.0f);
 	glm::vec2 minus1(-1.0f);

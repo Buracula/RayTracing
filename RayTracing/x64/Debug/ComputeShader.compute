@@ -80,24 +80,13 @@ float4 PhongIllumination(const IntersectionPoint intersectionPoint, const Ray ra
 	return totalColor;
 }
 
-float4 Shade(const IntersectionPoint intersectionPoint, const Ray ray)
+void CalculateShadowRay(const IntersectionPoint intersectionPoint, const Ray ray, const Light light,out Ray shadowRay)
 {
-	float4 output = 0;
-	//TODO ambient?
-	Ray shadowRay;
-
-	for (int i = 0; i < lightCount; i++)
-	{
-		//CalculateShadowRay(intersectionPoint, ray, mLights[i], shadowRay);
-
-		//if (!InShadow(shadowRay, mLights[i]))
-		{
-			output += PhongIllumination(intersectionPoint, ray, lights[i]);
-		}
-	}
-
-	return output;
+	shadowRay.direction = normalize(light.position - intersectionPoint.position);
+	shadowRay.origin = intersectionPoint.position + float3(0.005, 0.005, 0.005) * intersectionPoint.normal;
 }
+
+
 
 bool RaySphereIntersection(Sphere sphere, const Ray ray,out float t)
 {
@@ -149,8 +138,24 @@ bool RaySphereIntersection(Sphere sphere, const Ray ray,out float t)
 	}
 }
 
+bool RayPlaneIntersection(const float3 n, const float3 p0, const Ray ray,out float t)
+{
+	float denom = dot(n, ray.direction);
+	if (denom > 1e-6) {
+		float3 p0l0 = p0 - ray.origin;
+		t = dot(p0l0, n) / denom;
+		return (t >= 0);
+	}
+
+	return false;
+}
+
 bool FindClosestIntersection(Ray ray, out IntersectionPoint intersectionPoint, out float t)
 {
+	intersectionPoint.position = 0;
+	intersectionPoint.color = 0;
+	intersectionPoint.normal = 0;
+
 	float minT = 5873200;
 	int minIndex = -1;
 
@@ -166,28 +171,94 @@ bool FindClosestIntersection(Ray ray, out IntersectionPoint intersectionPoint, o
 		}
 	}
 
-	float sceneT;
+	float sceneT=0;
 
 
 	if (minIndex != -1)
 	{
-		t = minT;
-		intersectionPoint.position = ray.origin + ray.direction * t;
+		sceneT = minT;
+		intersectionPoint.position = ray.origin + ray.direction * sceneT;
 		intersectionPoint.color = spheres[minIndex].color;
 		intersectionPoint.normal = normalize(intersectionPoint.position - spheres[minIndex].center);
+		//return true;
+	}
+	//else
+	//{
+	//	intersectionPoint.position = 0;
+	//	intersectionPoint.color = 0;
+	//	intersectionPoint.normal = 0;
+	//	return false;
+	//}
+
+	float groundT=0;
+	bool intersectionWithScene = minIndex != -1;
+	bool intersectionWithGround = RayPlaneIntersection(float3(0, 0, -1), float3(0, 0, -10), ray, groundT);
+	if (intersectionWithScene || intersectionWithGround)
+	{
+		if (intersectionWithScene && intersectionWithGround)
+		{
+			if (groundT < sceneT)
+			{
+				intersectionPoint.normal = float3(0, 0, 1);
+				intersectionPoint.position = ray.origin + ray.direction * groundT;
+				intersectionPoint.color = float4(0.6, 0.6, 0.6, 1);
+				t = groundT;
+			}
+			else
+			{
+				t = sceneT;
+			}
+		}
+		else
+		{
+			if (intersectionWithScene)
+			{
+				t = sceneT;
+			}
+			else
+			{
+				intersectionPoint.normal = float3(0, 0, 1);
+				intersectionPoint.position = ray.origin + ray.direction * groundT;
+				intersectionPoint.color = float4(0.6, 0.6, 0.6, 1);
+				t = groundT;
+			}
+		}
 		return true;
 	}
-	else
-	{
-		intersectionPoint.position = 0;
-		intersectionPoint.color = 0;
-		intersectionPoint.normal = 0;
-		return false;
-	}
-
-	
+	return false;
 }
 
+bool InShadow(const Ray shadowRay, const Light light)
+{
+	IntersectionPoint intersectionPoint;
+	float maxT = length(light.position - shadowRay.origin);
+	float intersectionT;
+	if (FindClosestIntersection(shadowRay, intersectionPoint, intersectionT) && intersectionT < maxT)
+	{
+		return true;
+	}
+
+	return false;
+}
+
+float4 Shade(const IntersectionPoint intersectionPoint, const Ray ray)
+{
+	float4 output = 0;
+	//TODO ambient?
+	Ray shadowRay;
+
+	for (int i = 0; i < lightCount; i++)
+	{
+		CalculateShadowRay(intersectionPoint, ray, lights[i], shadowRay);
+
+		if (!InShadow(shadowRay, lights[i]))
+		{
+			output += PhongIllumination(intersectionPoint, ray, lights[i]);
+		}
+	}
+
+	return output;
+}
 
 void Trace(Ray ray, out float4 outputColor)
 {

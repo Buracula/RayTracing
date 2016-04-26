@@ -4,6 +4,8 @@
 #include <glm\glm.hpp>
 #include "Sphere.h"
 
+
+
 struct Ray
 {
 	glm::vec3 origin;
@@ -284,7 +286,95 @@ public:
 	void Build(const std::vector<Sphere*> &spheres);
 	bool FindClosestIntersection(const Ray &ray, IntersectionPoint &intersectionPoint, float& t)
 	{
+#ifdef USE_RECURSION
 		return FindClosestIntersectionOfNode(root, ray, intersectionPoint, t);
+#else
+
+		OctreeNode* treeStack[40];
+		int stackCount = 0;
+		treeStack[stackCount] = root;
+		stackCount++;
+		while (stackCount != 0)
+		{			
+			OctreeNode *currentNode = treeStack[stackCount - 1];
+			stackCount--;
+
+			if(currentNode->isLeafNode)
+			{
+				float minT = FLT_MAX;
+				int minIndex = -1;
+
+				for (int i = 0; i < currentNode->spheres.size(); i++)
+				{
+					if (RaySphereIntersection(*(currentNode->spheres[i]), ray, t))
+					{
+						if (t < minT)
+						{
+							minIndex = i;
+							minT = t;
+						}
+					}
+				}
+
+				if (minIndex != -1)
+				{
+					t = minT;
+					intersectionPoint.position = ray.origin + ray.direction * t;
+					intersectionPoint.color = currentNode->spheres[minIndex]->color;
+					intersectionPoint.normal = glm::normalize(intersectionPoint.position - currentNode->spheres[minIndex]->center);
+					return true;
+				}
+				else
+				{
+					continue;
+				}
+			}
+			else
+			{
+				int foundIntersection = 0;
+				ChildPoint indexDistancePairs[8];
+				for (int i = 0; i < 8; i++)
+				{
+					float intT;
+					if (CheckRayBoxIntersection(ray, currentNode->childNodes[i]->minCoordinates, currentNode->childNodes[i]->maxCoordinates, intT))
+					{						
+						indexDistancePairs[foundIntersection].point = intT;
+						indexDistancePairs[foundIntersection].childIndex = i;
+						foundIntersection++;
+					}
+				}
+				//sort
+				int n = foundIntersection;
+				while(1)
+				{
+					bool swapped = false;
+					for (int i = 1; i < foundIntersection; i++)
+					{
+						if(indexDistancePairs[i - 1].point > indexDistancePairs[i].point)
+						{
+							ChildPoint tempCP = indexDistancePairs[i - 1];
+							indexDistancePairs[i - 1] = indexDistancePairs[i];
+							indexDistancePairs[i] = tempCP;
+							swapped = true;
+						}
+					}
+					n--;
+					if(!swapped)
+						break;
+				}
+				//sort
+
+				for (int i = 0; i < foundIntersection; i++)
+				{
+					treeStack[stackCount] = currentNode->childNodes[indexDistancePairs[i].childIndex];
+					stackCount++;
+				}			
+			}			
+		}
+
+		return false;
+
+#endif // USE_RECURSION		
 	}
 	OctreeNode* GetNewNode(glm::vec3 &minCoordinates, glm::vec3 &maxCoordinates, const std::vector<Sphere*> &spheres, bool isLeafNode)
 	{
