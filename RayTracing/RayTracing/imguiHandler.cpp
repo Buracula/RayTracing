@@ -270,7 +270,7 @@ void ImguiHandler::Render()
 	//ImGui::ShowTestWindow(&show_test_window);
 	ImGui::Begin("Settings");
 	ImGui::SetWindowPos(ImVec2(850, 20), ImGuiSetCond_FirstUseEver);
-	ImGui::SetWindowSize(ImVec2(400, 170), ImGuiSetCond_FirstUseEver);
+	ImGui::SetWindowSize(ImVec2(400, 200), ImGuiSetCond_FirstUseEver);
 	ImGui::SliderFloat("Min Sphere Radius", &minSphereRadiuses, 0.5f, 10.0f);
 	ImGui::SliderFloat("Max Sphere Radius", &maxSphereRadiuses, 0.5f, 10.0f);
 	ImGui::SliderInt("Sphere Count", &sphereCount, 1, 200);

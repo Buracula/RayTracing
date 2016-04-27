@@ -329,6 +329,7 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
 	const float *srcPtr = tracer.GetRenderTargetBuffer();
 	unsigned char *dstPointer = new unsigned char[pixelCount * 4];
 
+#ifdef USE_GPU
 	ID3D11ComputeShader *computeShader;
  	{
 		ID3DBlob *compiledBlod;
@@ -341,6 +342,7 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
 		}
 		d3dDevice->CreateComputeShader(compiledBlod->GetBufferPointer(), compiledBlod->GetBufferSize(), nullptr, &computeShader);
 	}
+#endif
 
 	ID3D11ShaderResourceView *lightBufferSRV = nullptr;
 	ID3D11ShaderResourceView *sphereBufferSRV = nullptr;
@@ -431,7 +433,7 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
 			
 			ID3D11RenderTargetView *nullRTV = nullptr;
 			d3dDeviceContext->OMSetRenderTargets(1, &nullRTV, nullptr);
-
+#ifdef USE_GPU
  			d3dDeviceContext->CSSetShader(computeShader, nullptr, 0);
  			d3dDeviceContext->CSSetUnorderedAccessViews(0, 1, &screenTextureUAV, nullptr);
  			d3dDeviceContext->CSSetShaderResources(0, 1, &sphereBufferSRV);
@@ -441,6 +443,7 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
  			d3dDeviceContext->CSSetConstantBuffers(0, 1, &constantBufffer);
  			d3dDeviceContext->Dispatch(screenWidth / 16, screenHeight / 16, 1);
 
+#endif
 			ID3D11UnorderedAccessView *nullUAV = nullptr;
 			d3dDeviceContext->CSSetUnorderedAccessViews(0, 1, &nullUAV, nullptr);
 			d3dDeviceContext->OMSetRenderTargets(1, &screenTextureRTV, nullptr);
@@ -465,7 +468,10 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
 		}
 		//renderer.Render(d3dDeviceContext, &tracer.octree, viewProj);
 
-		//d3dDeviceContext->UpdateSubresource(screenTexture, 0, nullptr, dstPointer, sizeof(unsigned char) * 4 * screenWidth, 0);
+#ifndef USE_GPU 
+	d3dDeviceContext->UpdateSubresource(screenTexture, 0, nullptr, dstPointer, sizeof(unsigned char) * 4 * screenWidth, 0);
+#endif
+		
  		imguiHandler->StartNewFrame();
  		imguiHandler->Render();
 
