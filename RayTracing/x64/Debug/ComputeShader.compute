@@ -14,6 +14,8 @@ cbuffer GlobalVars : register(b0)
 	int lightCount;	
 };
 
+
+
 struct Sphere
 {
 	float3 center;
@@ -24,6 +26,12 @@ struct Sphere
 	float padding1;
 	float3 boundingBoxMax;
 	float padding2;
+};
+
+struct ChildPoint
+{
+	float minT;
+	int childIndex;
 };
 
 struct OctreeNodeGPU
@@ -150,7 +158,7 @@ bool RayPlaneIntersection(const float3 n, const float3 p0, const Ray ray,out flo
 	return false;
 }
 
-bool FindClosestIntersection(Ray ray, out IntersectionPoint intersectionPoint, out float t)
+/*bool FindClosestIntersection(Ray ray, out IntersectionPoint intersectionPoint, out float t)
 {
 	intersectionPoint.position = 0;
 	intersectionPoint.color = 0;
@@ -201,7 +209,180 @@ bool FindClosestIntersection(Ray ray, out IntersectionPoint intersectionPoint, o
 			{
 				intersectionPoint.normal = float3(0, 0, 1);
 				intersectionPoint.position = ray.origin + ray.direction * groundT;
+				intersectionPoint.color = float4(0.6, 0.6, 0.6, 1);				
+				
+				t = groundT;
+			}
+			else
+			{
+				t = sceneT;
+			}
+		}
+		else
+		{
+			if (intersectionWithScene)
+			{
+				t = sceneT;
+			}
+			else
+			{
+				intersectionPoint.normal = float3(0, 0, 1);
+				intersectionPoint.position = ray.origin + ray.direction * groundT;
 				intersectionPoint.color = float4(0.6, 0.6, 0.6, 1);
+				t = groundT;
+			}
+		}
+		return true;
+	}
+	return false;
+}*/
+
+bool CheckRayBoxIntersection(const Ray ray, const float3 boxMin, const float3 boxMax, out float outTMin)
+{
+	float tmin = -5873200, tmax = 5873200;
+
+	if (ray.direction.x != 0.0) 
+	{
+		float tx1 = (boxMin.x - ray.origin.x) / ray.direction.x;
+		float tx2 = (boxMax.x - ray.origin.x) / ray.direction.x;
+
+		tmin = max(tmin, min(tx1, tx2));
+		tmax = min(tmax, max(tx1, tx2));
+	}
+
+	if (ray.direction.y != 0.0) {
+		float ty1 = (boxMin.y - ray.origin.y) / ray.direction.y;
+		float ty2 = (boxMax.y - ray.origin.y) / ray.direction.y;
+
+		tmin = max(tmin, min(ty1, ty2));
+		tmax = min(tmax, max(ty1, ty2));
+	}
+
+	if (ray.direction.z != 0.0) {
+		float tz1 = (boxMin.z - ray.origin.z) / ray.direction.z;
+		float tz2 = (boxMax.z - ray.origin.z) / ray.direction.z;
+
+		tmin = max(tmin, min(tz1, tz2));
+		tmax = min(tmax, max(tz1, tz2));
+	}
+	outTMin = tmin;
+	return tmax >= tmin;
+}
+
+
+bool OctreeFindClosestIntersection(const Ray ray, IntersectionPoint intersectionPoint, float t)
+{
+	OctreeNodeGPU treeStack[40];
+	int stackCount = 0;
+	treeStack[stackCount] = octree[0];
+	stackCount++;
+	while (stackCount != 0)
+	{			
+		OctreeNodeGPU currentNode = treeStack[stackCount - 1];
+		stackCount--;
+
+		if(currentNode.isLeaf)
+		{
+			float minT = 5873200;
+			int minIndex = -1;
+
+			/*for (int i = 0; i < currentNode->spheres.size(); i++)
+			{
+			
+				if(RaySphereIntersection(spheres[i], ray, t))
+				//if (RaySphereIntersection(*(currentNode->spheres[i]), ray, t))
+				{
+					if (t < minT)
+					{
+						minIndex = i;
+						minT = t;
+					}
+				}
+			}*/
+
+			if (minIndex != -1)
+			{
+				t = minT;
+				//intersectionPoint.position = ray.origin + ray.direction * t;
+				//intersectionPoint.color = currentNode->spheres[minIndex]->color;
+				//intersectionPoint.normal = glm::normalize(intersectionPoint.position - currentNode->spheres[minIndex]->center);
+
+				intersectionPoint.position = 0;
+				intersectionPoint.color = 0;
+				intersectionPoint.normal = 0;
+
+				return true;
+			}
+			else
+			{
+				continue;
+			}
+		}
+		else
+		{
+			int tempchildIndices[8] = (int[8])currentNode.childIndices;
+
+			int foundIntersection = 0;
+			ChildPoint indexDistancePairs[8];
+			for (int i = 0; i < 8; i++)
+			{
+				float intT;
+				if (CheckRayBoxIntersection(ray, octree[tempchildIndices[i]].boxMin, octree[tempchildIndices[i]].boxMax, intT))
+				{						
+					indexDistancePairs[foundIntersection].minT = intT;
+					indexDistancePairs[foundIntersection].childIndex = tempchildIndices[i];
+					foundIntersection++;
+				}
+			}
+			//sort
+			int n = foundIntersection;
+			while(1)
+			{
+				bool swapped = false;
+				for (int j = 1; j < foundIntersection; j++)
+				{
+					if(indexDistancePairs[j - 1].minT > indexDistancePairs[j].minT)
+					{
+						ChildPoint tempCP = indexDistancePairs[j - 1];
+						indexDistancePairs[j - 1] = indexDistancePairs[j];
+						indexDistancePairs[j] = tempCP;
+						swapped = true;
+					}
+				}
+				n--;
+				if(!swapped)
+					break;
+			}
+			//sort
+
+			for (int k = 0; k < foundIntersection; k++)
+			{
+				treeStack[stackCount] = octree[indexDistancePairs[k].childIndex];
+				stackCount++;
+			}			
+		}			
+	}
+
+	return false;	
+}
+
+
+bool FindClosestIntersection(Ray ray, out IntersectionPoint intersectionPoint, out float t)
+{
+
+	float sceneT;
+	float groundT;
+	bool intersectionWithScene = OctreeFindClosestIntersection(ray, intersectionPoint, sceneT);
+	bool intersectionWithGround = RayPlaneIntersection(float3(0, 0, -1), float3(0, 0, -10), ray, groundT);
+	if (intersectionWithScene || intersectionWithGround)
+	{
+		if (intersectionWithScene && intersectionWithGround)
+		{
+			if (groundT < sceneT)
+			{
+				intersectionPoint.normal = float3(0, 0, 1);
+				intersectionPoint.position = ray.origin + ray.direction * groundT;
+				intersectionPoint.color = float4(0.6, 0.6, 0.6,1);
 				t = groundT;
 			}
 			else
