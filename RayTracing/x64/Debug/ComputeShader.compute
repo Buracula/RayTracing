@@ -40,7 +40,7 @@ struct OctreeNodeGPU
 	int isLeaf;
 
 	float3 boxMax;
-	float padding;
+	int sphereStartIndex;
 
 	int4 childIndices[2];
 };
@@ -69,6 +69,7 @@ struct IntersectionPoint
 StructuredBuffer<Sphere> spheres : register(t0);
 StructuredBuffer<Light> lights : register(t1);
 StructuredBuffer<OctreeNodeGPU> octree : register(t2);
+Buffer<int> leafToSphereIndices : register(t3);
 
 float4 PhongIllumination(const IntersectionPoint intersectionPoint, const Ray ray, const Light light)
 {
@@ -270,7 +271,7 @@ bool CheckRayBoxIntersection(const Ray ray, const float3 boxMin, const float3 bo
 }
 
 
-bool OctreeFindClosestIntersection(const Ray ray, IntersectionPoint intersectionPoint, out float t, out float test)
+bool OctreeFindClosestIntersection(const Ray ray, out IntersectionPoint intersectionPoint, out float t, out float test)
 {
 	test = 0;
 	OctreeNodeGPU treeStack[40];
@@ -286,31 +287,33 @@ bool OctreeFindClosestIntersection(const Ray ray, IntersectionPoint intersection
 		{
 			float minT = 5873200;
 			int minIndex = -1;
-
-			/*for (int i = 0; i < currentNode->spheres.size(); i++)
+			int sphereIndirectionBufferIndex = currentNode.sphereStartIndex;
+			int sphereIndex = leafToSphereIndices[sphereIndirectionBufferIndex];
+			while (sphereIndex != -1)
 			{
-			
-				if(RaySphereIntersection(spheres[i], ray, t))
+				if(RaySphereIntersection(spheres[sphereIndex], ray, t))
 				//if (RaySphereIntersection(*(currentNode->spheres[i]), ray, t))
 				{
 					if (t < minT)
 					{
-						minIndex = i;
+						minIndex = sphereIndex;
 						minT = t;
 					}
 				}
-			}*/
+				sphereIndirectionBufferIndex++;
+				sphereIndex = leafToSphereIndices[sphereIndirectionBufferIndex];
+			}
 
 			if (minIndex != -1)
 			{
 				t = minT;
-				//intersectionPoint.position = ray.origin + ray.direction * t;
-				//intersectionPoint.color = currentNode->spheres[minIndex]->color;
-				//intersectionPoint.normal = glm::normalize(intersectionPoint.position - currentNode->spheres[minIndex]->center);
+				intersectionPoint.position = ray.origin + ray.direction * t;
+				intersectionPoint.color = spheres[minIndex].color;
+				intersectionPoint.normal = normalize(intersectionPoint.position - spheres[minIndex].center);
 
-				intersectionPoint.position = 0;
-				intersectionPoint.color = 0;
-				intersectionPoint.normal = 0;
+//				intersectionPoint.position = 0;
+//				intersectionPoint.color = 0;
+//				intersectionPoint.normal = 0;
 
 				return true;
 			}
@@ -371,7 +374,6 @@ bool OctreeFindClosestIntersection(const Ray ray, IntersectionPoint intersection
 
 bool FindClosestIntersection(Ray ray, out IntersectionPoint intersectionPoint, out float t)
 {
-
 	float sceneT;
 	float groundT;
 	float test;
@@ -471,13 +473,13 @@ void main(uint3 threadId : SV_DispatchThreadID)
 	Ray ray;
 	ray.direction = rayDir;
 	ray.origin = mCameraPos;
-	IntersectionPoint intersectionPoint;
 	float4 oc;
-	float t;
-	float test;
-	OctreeFindClosestIntersection(ray, intersectionPoint, t, test);
-	oc = test;
-	//Trace(ray, oc);
+//	IntersectionPoint intersectionPoint;
+//	float t;
+//	float test;
+//	OctreeFindClosestIntersection(ray, intersectionPoint, t, test);
+//	oc = test;
+	Trace(ray, oc);
 
 	renderTarget[uint2(threadId.x, threadId.y)] = oc;
 }

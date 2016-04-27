@@ -1,5 +1,6 @@
 #include "RayTracer.h"
-//#include <assert.h>
+#include <map>
+#include <assert.h>
 
 RayTracer::RayTracer()
 	:octree(3, 4)
@@ -181,7 +182,7 @@ void RayTracer::SetCameraParams(const glm::vec3 camPos, const glm::vec3 lookAt, 
 void RayTracer::Update()
 {
 	octree.Build(mSpheres);
-
+	return;
 	glm::vec2 dimension(mWidth, mHeight);
 	glm::vec2 _2(2.0f);
 	glm::vec2 minus1(-1.0f);
@@ -237,42 +238,10 @@ void RayTracer::CreateGpuBuffers(
 	ID3D11ShaderResourceView **octreeBufferSRV, 
 	ID3D11ShaderResourceView **lightBufferSRV, 
 	ID3D11ShaderResourceView **sphereBufferSRV,
+	ID3D11ShaderResourceView **leafToSphereIndexBufferSRV,
 	ID3D11Buffer **constantBuffer
 	)
 {
-
-	{
-		OctreeNodeGPU *gpuNodes = new OctreeNodeGPU[octree.nodesLength];
-		for (int i_node = 0; i_node < octree.nodesLength; i_node++)
-		{
-			gpuNodes[i_node].boxMax = octree.nodes[i_node].maxCoordinates;
-			gpuNodes[i_node].boxMin = octree.nodes[i_node].minCoordinates;
-			gpuNodes[i_node].isLeaf = octree.nodes[i_node].isLeafNode;
-			if (!gpuNodes[i_node].isLeaf)
-			{
-				for (int i_child = 0; i_child < 8; i_child++)
-				{
-					gpuNodes[i_node].childIndices[i_child] = octree.nodes[i_node].childNodes[i_child] - octree.nodes;
-				}
-			}
-		}
-		D3D11_BUFFER_DESC bd;
-		memset(&bd, 0x00, sizeof(D3D11_BUFFER_DESC));
-		bd.BindFlags = D3D11_BIND_SHADER_RESOURCE;
-		bd.ByteWidth = sizeof(OctreeNodeGPU) * octree.nodesLength;
-		bd.MiscFlags = D3D11_RESOURCE_MISC_BUFFER_STRUCTURED;
-		bd.Usage = D3D11_USAGE_IMMUTABLE;
-		bd.StructureByteStride = sizeof(OctreeNodeGPU);
-
-		D3D11_SUBRESOURCE_DATA srd;
-		srd.pSysMem = gpuNodes;
-		srd.SysMemPitch = 0;
-		srd.SysMemSlicePitch = 0;
-		ID3D11Buffer *octreeBuffer;
-		device->CreateBuffer(&bd, &srd, &octreeBuffer);
-		device->CreateShaderResourceView(octreeBuffer, nullptr, octreeBufferSRV);
-		octreeBuffer->Release();
-	}
 	{
 		D3D11_BUFFER_DESC bd;
 		memset(&bd, 0x00, sizeof(D3D11_BUFFER_DESC));
@@ -291,6 +260,8 @@ void RayTracer::CreateGpuBuffers(
 		device->CreateShaderResourceView(lightBuffer, nullptr, lightBufferSRV);
 		lightBuffer->Release();
 	}
+	std::map<Sphere*, int> pointerToContinuousIndex;
+
 	{
 		D3D11_BUFFER_DESC bd;
 		memset(&bd, 0x00, sizeof(D3D11_BUFFER_DESC));
@@ -304,6 +275,7 @@ void RayTracer::CreateGpuBuffers(
 		for (int i = 0; i < mSpheres.size(); i++)
 		{
 			sphereBufferCPU[i] = *mSpheres[i];
+			pointerToContinuousIndex[mSpheres[i]] = i;
 		}
 
 		D3D11_SUBRESOURCE_DATA srd;
@@ -315,6 +287,86 @@ void RayTracer::CreateGpuBuffers(
 		device->CreateShaderResourceView(sphereBuffer, nullptr, sphereBufferSRV);
 		sphereBuffer->Release();
 		delete []sphereBufferCPU;
+	}
+
+	{
+		int requiredContinuousBuffer = 0;
+		for (int i_node = 0; i_node < octree.nodesLength; i_node++)
+		{
+			if (octree.nodes[i_node].isLeafNode)
+			{
+				requiredContinuousBuffer += octree.nodes[i_node].spheres.size() + 1; //+1 for sentinel index
+			}
+		}
+
+		int *continuousSphereIndexBuffer = new int[requiredContinuousBuffer];
+		int continuousSphereIndexCounter = 0;
+		OctreeNodeGPU *gpuNodes = new OctreeNodeGPU[octree.nodesLength];
+		for (int i_node = 0; i_node < octree.nodesLength; i_node++)
+		{
+			gpuNodes[i_node].boxMax = octree.nodes[i_node].maxCoordinates;
+			gpuNodes[i_node].boxMin = octree.nodes[i_node].minCoordinates;
+			gpuNodes[i_node].isLeaf = octree.nodes[i_node].isLeafNode;
+			if (gpuNodes[i_node].isLeaf)
+			{
+				gpuNodes[i_node].sphereStartIndex = continuousSphereIndexCounter;
+				for (int i_sphere = 0; i_sphere < octree.nodes[i_node].spheres.size(); i_sphere++)
+				{
+					auto mapIt = pointerToContinuousIndex.find(octree.nodes[i_node].spheres[i_sphere]);
+					assert(mapIt != pointerToContinuousIndex.end());
+					continuousSphereIndexBuffer[continuousSphereIndexCounter++] = mapIt->second;
+				}
+				continuousSphereIndexBuffer[continuousSphereIndexCounter++] = -1;//Sentinel
+			}
+			else
+			{
+				for (int i_child = 0; i_child < 8; i_child++)
+				{
+					gpuNodes[i_node].childIndices[i_child] = octree.nodes[i_node].childNodes[i_child] - octree.nodes;
+				}
+			}
+		}
+		D3D11_BUFFER_DESC nodeBufferDesc;
+		memset(&nodeBufferDesc, 0x00, sizeof(D3D11_BUFFER_DESC));
+		nodeBufferDesc.BindFlags = D3D11_BIND_SHADER_RESOURCE;
+		nodeBufferDesc.ByteWidth = sizeof(OctreeNodeGPU) * octree.nodesLength;
+		nodeBufferDesc.MiscFlags = D3D11_RESOURCE_MISC_BUFFER_STRUCTURED;
+		nodeBufferDesc.Usage = D3D11_USAGE_IMMUTABLE;
+		nodeBufferDesc.StructureByteStride = sizeof(OctreeNodeGPU);
+
+		D3D11_SUBRESOURCE_DATA srd;
+		srd.pSysMem = gpuNodes;
+		srd.SysMemPitch = 0;
+		srd.SysMemSlicePitch = 0;
+		ID3D11Buffer *octreeBuffer;
+		device->CreateBuffer(&nodeBufferDesc, &srd, &octreeBuffer);
+		device->CreateShaderResourceView(octreeBuffer, nullptr, octreeBufferSRV);
+		octreeBuffer->Release();
+
+
+
+		D3D11_BUFFER_DESC leafToSphereBufferDesc;
+		memset(&leafToSphereBufferDesc, 0x00, sizeof(D3D11_BUFFER_DESC));
+		leafToSphereBufferDesc.BindFlags = D3D11_BIND_SHADER_RESOURCE;
+		leafToSphereBufferDesc.ByteWidth = sizeof(int) * requiredContinuousBuffer;
+		leafToSphereBufferDesc.Usage = D3D11_USAGE_IMMUTABLE;
+
+		D3D11_SHADER_RESOURCE_VIEW_DESC leafToSphereBufferDescSRVD;
+		memset(&leafToSphereBufferDescSRVD, 0x00, sizeof(D3D11_SHADER_RESOURCE_VIEW_DESC));
+		leafToSphereBufferDescSRVD.ViewDimension = D3D11_SRV_DIMENSION_BUFFER;
+		leafToSphereBufferDescSRVD.Format = DXGI_FORMAT_R32_SINT;
+		leafToSphereBufferDescSRVD.Buffer.FirstElement = 0;
+		leafToSphereBufferDescSRVD.Buffer.NumElements = requiredContinuousBuffer;
+
+		srd.pSysMem = continuousSphereIndexBuffer;
+		srd.SysMemPitch = 0;
+		srd.SysMemSlicePitch = 0;
+		ID3D11Buffer *leafToSphereIndexBuffer;
+		device->CreateBuffer(&leafToSphereBufferDesc, &srd, &leafToSphereIndexBuffer);
+		device->CreateShaderResourceView(leafToSphereIndexBuffer, &leafToSphereBufferDescSRVD, leafToSphereIndexBufferSRV);
+		leafToSphereIndexBuffer->Release();
+
+		delete[]continuousSphereIndexBuffer;
 	}
 	{
 		ConstantBuffer cb;

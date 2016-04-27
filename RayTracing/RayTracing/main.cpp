@@ -331,20 +331,21 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
 
 	ID3D11ComputeShader *computeShader;
  	{
-// 		ID3DBlob *compiledBlod;
-// 		ID3DBlob *errorMessage;
-// 		D3DCompileFromFile(L"ComputeShader.compute", nullptr, nullptr, "main", "cs_5_0", 0, 0, &compiledBlod, &errorMessage);
-// 		if (errorMessage)
-// 		{
-// 				const char *asd = (const char *)errorMessage->GetBufferPointer();
-// 				__debugbreak();
-// 		}
-// 		d3dDevice->CreateComputeShader(compiledBlod->GetBufferPointer(), compiledBlod->GetBufferSize(), nullptr, &computeShader);
+		ID3DBlob *compiledBlod;
+		ID3DBlob *errorMessage;
+		D3DCompileFromFile(L"ComputeShader.compute", nullptr, nullptr, "main", "cs_5_0", 0, 0, &compiledBlod, &errorMessage);
+		if (!compiledBlod && errorMessage)
+		{
+				const char *asd = (const char *)errorMessage->GetBufferPointer();
+				__debugbreak();
+		}
+		d3dDevice->CreateComputeShader(compiledBlod->GetBufferPointer(), compiledBlod->GetBufferSize(), nullptr, &computeShader);
 	}
 
 	ID3D11ShaderResourceView *lightBufferSRV = nullptr;
 	ID3D11ShaderResourceView *sphereBufferSRV = nullptr;
 	ID3D11ShaderResourceView *octreeBufferSRV = nullptr;
+	ID3D11ShaderResourceView *leafToSphereBuffer = nullptr;
 	ID3D11Buffer *constantBufffer = nullptr;
 
 	Octree_renderer renderer(d3dDevice, screenWidth, screenHeight);
@@ -362,6 +363,7 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
 			SAFE_RELEASE(sphereBufferSRV);
 			SAFE_RELEASE(octreeBufferSRV);
 			SAFE_RELEASE(constantBufffer);
+			SAFE_RELEASE(leafToSphereBuffer);
 			float minRadius = imguiHandler->minSphereRadiuses;
 			float maxRadius = imguiHandler->maxSphereRadiuses;
 
@@ -425,18 +427,19 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
 			PerformanceCounter::StartCounter();
 			tracer.Update();
 			imguiHandler->rayTracingTime = PerformanceCounter::GetCounter();
-			tracer.CreateGpuBuffers(d3dDevice, &octreeBufferSRV, &lightBufferSRV, &sphereBufferSRV, &constantBufffer);
+			tracer.CreateGpuBuffers(d3dDevice, &octreeBufferSRV, &lightBufferSRV, &sphereBufferSRV, &leafToSphereBuffer, &constantBufffer);
 			
 			ID3D11RenderTargetView *nullRTV = nullptr;
 			d3dDeviceContext->OMSetRenderTargets(1, &nullRTV, nullptr);
 
-// 			d3dDeviceContext->CSSetShader(computeShader, nullptr, 0);
-// 			d3dDeviceContext->CSSetUnorderedAccessViews(0, 1, &screenTextureUAV, nullptr);
-// 			d3dDeviceContext->CSSetShaderResources(0, 1, &sphereBufferSRV);
-// 			d3dDeviceContext->CSSetShaderResources(1, 1, &lightBufferSRV);
-// 			d3dDeviceContext->CSSetShaderResources(2, 1, &octreeBufferSRV);
-// 			d3dDeviceContext->CSSetConstantBuffers(0, 1, &constantBufffer);
-// 			d3dDeviceContext->Dispatch(screenWidth / 16, screenHeight / 16, 1);
+ 			d3dDeviceContext->CSSetShader(computeShader, nullptr, 0);
+ 			d3dDeviceContext->CSSetUnorderedAccessViews(0, 1, &screenTextureUAV, nullptr);
+ 			d3dDeviceContext->CSSetShaderResources(0, 1, &sphereBufferSRV);
+ 			d3dDeviceContext->CSSetShaderResources(1, 1, &lightBufferSRV);
+			d3dDeviceContext->CSSetShaderResources(2, 1, &octreeBufferSRV);
+			d3dDeviceContext->CSSetShaderResources(3, 1, &leafToSphereBuffer);
+ 			d3dDeviceContext->CSSetConstantBuffers(0, 1, &constantBufffer);
+ 			d3dDeviceContext->Dispatch(screenWidth / 16, screenHeight / 16, 1);
 
 			ID3D11UnorderedAccessView *nullUAV = nullptr;
 			d3dDeviceContext->CSSetUnorderedAccessViews(0, 1, &nullUAV, nullptr);
@@ -460,9 +463,9 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
 			DispatchMessage(&msg);
 			continue;
 		}
-		renderer.Render(d3dDeviceContext, &tracer.octree, viewProj);
+		//renderer.Render(d3dDeviceContext, &tracer.octree, viewProj);
 
-		d3dDeviceContext->UpdateSubresource(screenTexture, 0, nullptr, dstPointer, sizeof(unsigned char) * 4 * screenWidth, 0);
+		//d3dDeviceContext->UpdateSubresource(screenTexture, 0, nullptr, dstPointer, sizeof(unsigned char) * 4 * screenWidth, 0);
  		imguiHandler->StartNewFrame();
  		imguiHandler->Render();
 

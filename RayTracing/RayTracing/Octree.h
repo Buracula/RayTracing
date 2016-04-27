@@ -145,7 +145,7 @@ struct OctreeNodeGPU
 	int isLeaf;
 
 	glm::vec3 boxMax;
-	float padding;
+	int sphereStartIndex;
 	 
 	int childIndices[8];
 };

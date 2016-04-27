@@ -62,6 +62,6 @@ public:
 		mLights.clear();
 	}
 
-	void CreateGpuBuffers(ID3D11Device *device, ID3D11ShaderResourceView **octreeBufferSRV, ID3D11ShaderResourceView **lightBufferSRV, ID3D11ShaderResourceView **sphereBufferSRV,
+	void CreateGpuBuffers(ID3D11Device *device, ID3D11ShaderResourceView **octreeBufferSRV, ID3D11ShaderResourceView **lightBufferSRV, ID3D11ShaderResourceView **sphereBufferSRV, ID3D11ShaderResourceView **leafToSphereIndexBufferSRV,
 		ID3D11Buffer **constantBuffer);
 };
