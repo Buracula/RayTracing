@@ -423,12 +423,22 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
 
 			Light light1;
 			light1.color = glm::vec4(1000, 1000, 1000, 1);
-			light1.position = glm::vec3(0, 0, 15);
+			light1.position = glm::vec3(0, 0, 20);
+#ifdef BAHAR
+		light1.position = glm::vec3(-10, -5, 20);
+#endif // BAHAR
+
+			
 
 			tracer.AddLight(light1);
+#ifndef USE_GPU
 			PerformanceCounter::StartCounter();
+#endif // USE_GPU
 			tracer.Update();
+#ifndef USE_GPU
 			imguiHandler->rayTracingTime = PerformanceCounter::GetCounter();
+#endif // USE_GPU
+			
 #ifdef USE_GPU
 			tracer.CreateGpuBuffers(d3dDevice, &octreeBufferSRV, &lightBufferSRV, &sphereBufferSRV, &leafToSphereBuffer, &constantBufffer);
 
@@ -481,6 +491,7 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
 				float frequency = static_cast<float>(disjointData.Frequency);
 				kernelTime = (delta / frequency) * 1000.0f;
 			}
+			imguiHandler->rayTracingTime = kernelTime;
 #else
 			for (int i_pixel = 0; i_pixel < pixelCount; i_pixel++)
 			{

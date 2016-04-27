@@ -1,5 +1,5 @@
 #pragma once
-//#define BAHAR
+#define BAHAR
 
 #include <d3d11.h>
 #include <imgui.h>
