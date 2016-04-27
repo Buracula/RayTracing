@@ -423,7 +423,9 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
 			d3dDeviceContext->CSSetConstantBuffers(0, 1, &constantBufffer);
 			d3dDeviceContext->Dispatch(screenWidth / 16, screenHeight / 16, 1);
 
-			//renderer.Render(d3dDeviceContext, &tracer.octree, viewProj);
+			ID3D11UnorderedAccessView *nullUAV = nullptr;
+			d3dDeviceContext->CSSetUnorderedAccessViews(0, 1, &nullUAV, nullptr);
+			d3dDeviceContext->OMSetRenderTargets(1, &screenTextureRTV, nullptr);
 
 			for (int i_pixel = 0; i_pixel < pixelCount; i_pixel++)
 			{
@@ -443,6 +445,8 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
 			DispatchMessage(&msg);
 			continue;
 		}
+		renderer.Render(d3dDeviceContext, &tracer.octree, viewProj);
+
 		//d3dDeviceContext->UpdateSubresource(screenTexture, 0, nullptr, dstPointer, sizeof(unsigned char) * 4 * screenWidth, 0);
  		imguiHandler->StartNewFrame();
  		imguiHandler->Render();
