@@ -429,11 +429,11 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
 			PerformanceCounter::StartCounter();
 			tracer.Update();
 			imguiHandler->rayTracingTime = PerformanceCounter::GetCounter();
+#ifdef USE_GPU
 			tracer.CreateGpuBuffers(d3dDevice, &octreeBufferSRV, &lightBufferSRV, &sphereBufferSRV, &leafToSphereBuffer, &constantBufffer);
-			
+
 			ID3D11RenderTargetView *nullRTV = nullptr;
 			d3dDeviceContext->OMSetRenderTargets(1, &nullRTV, nullptr);
-#ifdef USE_GPU
  			d3dDeviceContext->CSSetShader(computeShader, nullptr, 0);
  			d3dDeviceContext->CSSetUnorderedAccessViews(0, 1, &screenTextureUAV, nullptr);
  			d3dDeviceContext->CSSetShaderResources(0, 1, &sphereBufferSRV);
@@ -441,13 +441,47 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
 			d3dDeviceContext->CSSetShaderResources(2, 1, &octreeBufferSRV);
 			d3dDeviceContext->CSSetShaderResources(3, 1, &leafToSphereBuffer);
  			d3dDeviceContext->CSSetConstantBuffers(0, 1, &constantBufffer);
+			
+			D3D11_QUERY_DESC desc;
+			desc.Query = D3D11_QUERY_TIMESTAMP_DISJOINT;
+			desc.MiscFlags = 0;
+			ID3D11Query *disjointQuery;
+			ID3D11Query *timestampStartQuery;
+			ID3D11Query *timestampEndQuery;
+			d3dDevice->CreateQuery(&desc, &disjointQuery);
+
+			desc.Query = D3D11_QUERY_TIMESTAMP;
+			d3dDevice->CreateQuery(&desc, &timestampStartQuery);
+			d3dDevice->CreateQuery(&desc, &timestampEndQuery);
+			d3dDeviceContext->Begin(disjointQuery);
+			d3dDeviceContext->End(timestampStartQuery);
  			d3dDeviceContext->Dispatch(screenWidth / 16, screenHeight / 16, 1);
 
-#endif
+			d3dDeviceContext->End(timestampEndQuery);
+			d3dDeviceContext->End(disjointQuery);
+
 			ID3D11UnorderedAccessView *nullUAV = nullptr;
 			d3dDeviceContext->CSSetUnorderedAccessViews(0, 1, &nullUAV, nullptr);
 			d3dDeviceContext->OMSetRenderTargets(1, &screenTextureRTV, nullptr);
 
+
+			UINT64 startTime = 0;
+			while (d3dDeviceContext->GetData(timestampStartQuery, &startTime, sizeof(startTime), 0) != S_OK);
+
+			UINT64 endTime = 0;
+			while (d3dDeviceContext->GetData(timestampEndQuery, &endTime, sizeof(endTime), 0) != S_OK);
+
+			D3D11_QUERY_DATA_TIMESTAMP_DISJOINT disjointData;
+			while (d3dDeviceContext->GetData(disjointQuery, &disjointData, sizeof(disjointData), 0) != S_OK);
+			
+			float kernelTime = 0.0f;
+			if (disjointData.Disjoint == FALSE)
+			{
+				UINT64 delta = endTime - startTime;
+				float frequency = static_cast<float>(disjointData.Frequency);
+				kernelTime = (delta / frequency) * 1000.0f;
+			}
+#else
 			for (int i_pixel = 0; i_pixel < pixelCount; i_pixel++)
 			{
 				unsigned int pixelStart = i_pixel * 4;
@@ -456,7 +490,7 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
 				dstPointer[pixelStart + 2] = glm::clamp(srcPtr[pixelStart + 2], 0.0f, 1.f) * 255.0f;
 				dstPointer[pixelStart + 3] = glm::clamp(srcPtr[pixelStart + 3], 0.0f, 1.f) * 255.0f;
 			}
-
+#endif
 			imguiHandler->rebuildRequested = false;
 		}
 
