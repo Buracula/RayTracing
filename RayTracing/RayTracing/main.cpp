@@ -9,8 +9,10 @@
 #include "imguiHandler.h"
 #include "RayTracer.h"
 #include "Octree.h"
+#include "PerformanceCounter.h"
 
 #define SAFE_RELEASE(x) if((x)){(x)->Release();(x) = nullptr;}
+
 
 class Octree_renderer
 {
@@ -328,16 +330,16 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
 	unsigned char *dstPointer = new unsigned char[pixelCount * 4];
 
 	ID3D11ComputeShader *computeShader;
-	{
-		ID3DBlob *compiledBlod;
-		ID3DBlob *errorMessage;
-		D3DCompileFromFile(L"ComputeShader.compute", nullptr, nullptr, "main", "cs_5_0", 0, 0, &compiledBlod, &errorMessage);
-		if (errorMessage)
-		{
-				const char *asd = (const char *)errorMessage->GetBufferPointer();
-				__debugbreak();
-		}
-		d3dDevice->CreateComputeShader(compiledBlod->GetBufferPointer(), compiledBlod->GetBufferSize(), nullptr, &computeShader);
+ 	{
+// 		ID3DBlob *compiledBlod;
+// 		ID3DBlob *errorMessage;
+// 		D3DCompileFromFile(L"ComputeShader.compute", nullptr, nullptr, "main", "cs_5_0", 0, 0, &compiledBlod, &errorMessage);
+// 		if (errorMessage)
+// 		{
+// 				const char *asd = (const char *)errorMessage->GetBufferPointer();
+// 				__debugbreak();
+// 		}
+// 		d3dDevice->CreateComputeShader(compiledBlod->GetBufferPointer(), compiledBlod->GetBufferSize(), nullptr, &computeShader);
 	}
 
 	ID3D11ShaderResourceView *lightBufferSRV = nullptr;
@@ -362,8 +364,13 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
 			SAFE_RELEASE(constantBufffer);
 			float minRadius = imguiHandler->minSphereRadiuses;
 			float maxRadius = imguiHandler->maxSphereRadiuses;
+
 			glm::vec3 maxSpherePos(20, 20, 5);
 			int sphereCount = imguiHandler->sphereCount;
+#ifdef BAHAR
+			sphereCount = imguiHandler->sphereNum;
+			//maxSpherePos = glm::vec3(40, 40, 40);
+#endif
 			for (int i_sphere = 0; i_sphere < sphereCount; i_sphere++)
 			{
 				glm::vec3 sphereCenter;
@@ -371,9 +378,13 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
 				if (!imguiHandler->sphereOverlap)
 				{
 					bool validSphere = true;
-					while (1)
+					int tryCount = 0;
+					while (1 && tryCount < 30)
 					{
 						sphereCenter = glm::vec3(RandomFloat(), RandomFloat(), RandomFloat());
+#ifdef BAHAR
+						sphereCenter = sphereCenter * 2.0f - 1.0f;
+#endif
 						sphereCenter *= maxSpherePos;
 						sphereRad = RandomFloat() * (maxRadius - minRadius) + minRadius;
 
@@ -391,6 +402,8 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
 						{
 							break;
 						}
+
+						tryCount++;
 					}
 				}
 				else
@@ -409,19 +422,21 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
 			light1.position = glm::vec3(0, 0, 15);
 
 			tracer.AddLight(light1);
+			PerformanceCounter::StartCounter();
 			tracer.Update();
+			imguiHandler->rayTracingTime = PerformanceCounter::GetCounter();
 			tracer.CreateGpuBuffers(d3dDevice, &octreeBufferSRV, &lightBufferSRV, &sphereBufferSRV, &constantBufffer);
 			
 			ID3D11RenderTargetView *nullRTV = nullptr;
 			d3dDeviceContext->OMSetRenderTargets(1, &nullRTV, nullptr);
 
-			d3dDeviceContext->CSSetShader(computeShader, nullptr, 0);
-			d3dDeviceContext->CSSetUnorderedAccessViews(0, 1, &screenTextureUAV, nullptr);
-			d3dDeviceContext->CSSetShaderResources(0, 1, &sphereBufferSRV);
-			d3dDeviceContext->CSSetShaderResources(1, 1, &lightBufferSRV);
-			d3dDeviceContext->CSSetShaderResources(2, 1, &octreeBufferSRV);
-			d3dDeviceContext->CSSetConstantBuffers(0, 1, &constantBufffer);
-			d3dDeviceContext->Dispatch(screenWidth / 16, screenHeight / 16, 1);
+// 			d3dDeviceContext->CSSetShader(computeShader, nullptr, 0);
+// 			d3dDeviceContext->CSSetUnorderedAccessViews(0, 1, &screenTextureUAV, nullptr);
+// 			d3dDeviceContext->CSSetShaderResources(0, 1, &sphereBufferSRV);
+// 			d3dDeviceContext->CSSetShaderResources(1, 1, &lightBufferSRV);
+// 			d3dDeviceContext->CSSetShaderResources(2, 1, &octreeBufferSRV);
+// 			d3dDeviceContext->CSSetConstantBuffers(0, 1, &constantBufffer);
+// 			d3dDeviceContext->Dispatch(screenWidth / 16, screenHeight / 16, 1);
 
 			ID3D11UnorderedAccessView *nullUAV = nullptr;
 			d3dDeviceContext->CSSetUnorderedAccessViews(0, 1, &nullUAV, nullptr);
@@ -447,7 +462,7 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
 		}
 		renderer.Render(d3dDeviceContext, &tracer.octree, viewProj);
 
-		//d3dDeviceContext->UpdateSubresource(screenTexture, 0, nullptr, dstPointer, sizeof(unsigned char) * 4 * screenWidth, 0);
+		d3dDeviceContext->UpdateSubresource(screenTexture, 0, nullptr, dstPointer, sizeof(unsigned char) * 4 * screenWidth, 0);
  		imguiHandler->StartNewFrame();
  		imguiHandler->Render();
 

@@ -1,4 +1,5 @@
 #pragma once
+//#define BAHAR
 
 #include <d3d11.h>
 #include <imgui.h>
@@ -31,6 +32,7 @@ public:
 	void Init();
 	void StartNewFrame();
 	void Render();
+	void Render2();
 	void OnRender(ImDrawData* draw_data);
 
 	bool rebuildRequested;
@@ -38,6 +40,9 @@ public:
 	bool sphereOverlap;
 	float minSphereRadiuses;
 	float maxSphereRadiuses;
+    char sphereNumText[3];
+	int sphereNum;
+	int rayTracingTime;
 };
 
 extern ImguiHandler *imguiHandler;

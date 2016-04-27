@@ -1,5 +1,7 @@
 #include "imguiHandler.h"
 #include <d3dcompiler.h>
+#include <string>
+
 struct VERTEX_CONSTANT_BUFFER
 {
 	float        mvp[4][4];
@@ -25,6 +27,17 @@ ImguiHandler::ImguiHandler(ID3D11DeviceContext *d3dDeviceContext, ID3D11Device *
 	sphereOverlap = true;
 	minSphereRadiuses = 2;
 	maxSphereRadiuses = 2;
+	rayTracingTime = 0;
+
+#ifdef BAHAR
+	sphereOverlap = false;
+	minSphereRadiuses = 1;
+	maxSphereRadiuses = 5;
+#endif
+
+	sphereNum = 4;
+	sphereNumText[0] = '4';
+	sphereNumText[1] = '\0';
 }
 
 void ImguiHandler::Init()
@@ -248,20 +261,59 @@ void ImguiHandler::StartNewFrame()
 
 void ImguiHandler::Render()
 {
+#ifdef BAHAR
+	Render2();
+#else
+
 	bool show_test_window = true;
 	     // Normally user code doesn't need/want to call it because positions are saved in .ini file anyway. Here we just want to make the demo initial state a bit more friendly!
 	//ImGui::ShowTestWindow(&show_test_window);
 	ImGui::Begin("Settings");
 	ImGui::SetWindowPos(ImVec2(850, 20), ImGuiSetCond_FirstUseEver);
-	ImGui::SetWindowSize(ImVec2(400, 150), ImGuiSetCond_FirstUseEver);
+	ImGui::SetWindowSize(ImVec2(400, 170), ImGuiSetCond_FirstUseEver);
 	ImGui::SliderFloat("Min Sphere Radius", &minSphereRadiuses, 0.5f, 10.0f);
 	ImGui::SliderFloat("Max Sphere Radius", &maxSphereRadiuses, 0.5f, 10.0f);
 	ImGui::SliderInt("Sphere Count", &sphereCount, 1, 200);
 	ImGui::Checkbox("Spheres can overlap", &sphereOverlap);
+
+	std::string rayTracingTimeText = std::to_string(rayTracingTime);
+	ImGui::LabelText(rayTracingTimeText.c_str(), "RayTrace Time(ms):");
+
 	if (ImGui::Button("Update"))
 	{
 		rebuildRequested = true;
 	}
+	ImGui::End();
+
+	ImGui::Render();
+#endif
+}
+
+
+void ImguiHandler::Render2()
+{
+	bool show_test_window = true;
+	// Normally user code doesn't need/want to call it because positions are saved in .ini file anyway. Here we just want to make the demo initial state a bit more friendly!
+	//ImGui::ShowTestWindow(&show_test_window);
+	ImGui::Begin("Sphere Features");
+	ImGui::SetWindowPos(ImVec2(10, 5), ImGuiSetCond_FirstUseEver);
+	ImGui::SetWindowSize(ImVec2(350, 140), ImGuiSetCond_FirstUseEver);
+	ImGui::PushItemWidth(100);
+	ImGui::InputText("Sphere Number", sphereNumText, sizeof(sphereNumText));
+	ImGui::PushItemWidth(200);
+	ImGui::SliderFloat("Min Sphere Radius", &minSphereRadiuses, 0.5f, 10.0f, "%.1f");
+	ImGui::SliderFloat("Max Sphere Radius", &maxSphereRadiuses, 0.5f, 10.0f, "%.1f");
+	//ImGui::SliderInt("Sphere Count", &sphereCount, 1, 200);
+	//ImGui::Checkbox("Spheres can overlap", &sphereOverlap);
+	if (ImGui::Button("Ray Trace!"))
+	{
+		sphereNum = atoi(sphereNumText);
+		rebuildRequested = true;
+	}
+	std::string rayTracingTimeText = std::to_string(rayTracingTime);
+	ImGui::LabelText(rayTracingTimeText.c_str(), "Time in ms:");
+
+
 	ImGui::End();
 
 	ImGui::Render();
