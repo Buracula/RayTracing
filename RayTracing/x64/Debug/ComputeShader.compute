@@ -270,8 +270,9 @@ bool CheckRayBoxIntersection(const Ray ray, const float3 boxMin, const float3 bo
 }
 
 
-bool OctreeFindClosestIntersection(const Ray ray, IntersectionPoint intersectionPoint, float t)
+bool OctreeFindClosestIntersection(const Ray ray, IntersectionPoint intersectionPoint, out float t, out float test)
 {
+	test = 0;
 	OctreeNodeGPU treeStack[40];
 	int stackCount = 0;
 	treeStack[stackCount] = octree[0];
@@ -332,6 +333,7 @@ bool OctreeFindClosestIntersection(const Ray ray, IntersectionPoint intersection
 					indexDistancePairs[foundIntersection].minT = intT;
 					indexDistancePairs[foundIntersection].childIndex = tempchildIndices[i];
 					foundIntersection++;
+					test += 0.1;
 				}
 			}
 			//sort
@@ -372,7 +374,8 @@ bool FindClosestIntersection(Ray ray, out IntersectionPoint intersectionPoint, o
 
 	float sceneT;
 	float groundT;
-	bool intersectionWithScene = OctreeFindClosestIntersection(ray, intersectionPoint, sceneT);
+	float test;
+	bool intersectionWithScene = OctreeFindClosestIntersection(ray, intersectionPoint, sceneT, test);
 	bool intersectionWithGround = RayPlaneIntersection(float3(0, 0, -1), float3(0, 0, -10), ray, groundT);
 	if (intersectionWithScene || intersectionWithGround)
 	{
@@ -468,8 +471,13 @@ void main(uint3 threadId : SV_DispatchThreadID)
 	Ray ray;
 	ray.direction = rayDir;
 	ray.origin = mCameraPos;
+	IntersectionPoint intersectionPoint;
 	float4 oc;
-	Trace(ray, oc);
+	float t;
+	float test;
+	OctreeFindClosestIntersection(ray, intersectionPoint, t, test);
+	oc = test;
+	//Trace(ray, oc);
 
 	renderTarget[uint2(threadId.x, threadId.y)] = oc;
 }
