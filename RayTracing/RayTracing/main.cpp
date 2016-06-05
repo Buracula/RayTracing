@@ -143,7 +143,7 @@ public:
 			const char *ps =
 				"float4 main_ps() : SV_Target"
 				"{"
-				"	return float4(1,0,1,1);"
+				"	return float4(1,1,0,1);"
 				"}";
 			ID3DBlob *compiledCode;
 			ID3DBlob *errorCode;
@@ -296,7 +296,7 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
 	scd.BufferDesc.Width = screenWidth;
 	scd.BufferDesc.RefreshRate.Numerator = 60;
 	scd.BufferDesc.RefreshRate.Denominator = 1;
-	scd.BufferUsage = DXGI_USAGE_RENDER_TARGET_OUTPUT|DXGI_USAGE_UNORDERED_ACCESS;
+	scd.BufferUsage = DXGI_USAGE_RENDER_TARGET_OUTPUT;
 	scd.OutputWindow = windowHandle;
 	scd.SampleDesc.Count = 1;
 	scd.Windowed = TRUE;
@@ -305,11 +305,21 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
 		&scd, &d3dSwapChain, &d3dDevice, &outLevel, &d3dDeviceContext);
 	ID3D11Texture2D *screenTexture;
 	ID3D11RenderTargetView *screenTextureRTV;
-	ID3D11UnorderedAccessView *screenTextureUAV;
 	d3dSwapChain->GetBuffer(0, __uuidof(ID3D11Texture2D), (void**)&screenTexture);
 	d3dDevice->CreateRenderTargetView(screenTexture, nullptr, &screenTextureRTV);
-	d3dDevice->CreateUnorderedAccessView(screenTexture, nullptr, &screenTextureUAV);
 	d3dDeviceContext->OMSetRenderTargets(1, &screenTextureRTV, nullptr);
+
+	ID3D11Texture2D *outputTexture;
+	ID3D11UnorderedAccessView *outputTextureUAV;
+	{
+		D3D11_TEXTURE2D_DESC rtHelperDesc;
+		screenTexture->GetDesc(&rtHelperDesc);
+
+		rtHelperDesc.BindFlags |= D3D11_BIND_UNORDERED_ACCESS;
+		d3dDevice->CreateTexture2D(&rtHelperDesc, nullptr, &outputTexture);
+		d3dDevice->CreateUnorderedAccessView(outputTexture, nullptr, &outputTextureUAV);
+	}
+
 	//////////////////////////////////////////////////////////////////////////
 	//UI
 	//////////////////////////////////////////////////////////////////////////
@@ -329,20 +339,21 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
 	const float *srcPtr = tracer.GetRenderTargetBuffer();
 	unsigned char *dstPointer = new unsigned char[pixelCount * 4];
 
-#ifdef USE_GPU
-	ID3D11ComputeShader *computeShader;
- 	{
-		ID3DBlob *compiledBlod;
-		ID3DBlob *errorMessage;
-		D3DCompileFromFile(L"ComputeShader.compute", nullptr, nullptr, "main", "cs_5_0", 0, 0, &compiledBlod, &errorMessage);
-		if (!compiledBlod && errorMessage)
+	ID3D11ComputeShader *computeShader = nullptr;
+	if (imguiHandler->useGpu)
+	{
 		{
+			ID3DBlob *compiledBlod;
+			ID3DBlob *errorMessage;
+			D3DCompileFromFile(L"ComputeShader.compute", nullptr, nullptr, "main", "cs_5_0", 0, 0, &compiledBlod, &errorMessage);
+			if (!compiledBlod && errorMessage)
+			{
 				const char *asd = (const char *)errorMessage->GetBufferPointer();
 				__debugbreak();
+			}
+			d3dDevice->CreateComputeShader(compiledBlod->GetBufferPointer(), compiledBlod->GetBufferSize(), nullptr, &computeShader);
 		}
-		d3dDevice->CreateComputeShader(compiledBlod->GetBufferPointer(), compiledBlod->GetBufferSize(), nullptr, &computeShader);
 	}
-#endif
 
 	ID3D11ShaderResourceView *lightBufferSRV = nullptr;
 	ID3D11ShaderResourceView *sphereBufferSRV = nullptr;
@@ -424,84 +435,111 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
 			Light light1;
 			light1.color = glm::vec4(1000, 1000, 1000, 1);
 			light1.position = glm::vec3(0, 0, 20);
+
+			Light light2;
+			light2.color = glm::vec4(1000, 1000, 1000, 1);
+			light2.position = glm::vec3(-10, -10, 30);
+
+			Light light3;
+			light3.color = glm::vec4(1000, 1000, 1000, 1);
+			light3.position = glm::vec3(-10, 10, 40);
 #ifdef BAHAR
-		light1.position = glm::vec3(-10, -5, 20);
+			light1.position = glm::vec3(-10, -5, 20);
 #endif // BAHAR
 
-			
 
-			tracer.AddLight(light1);
-#ifndef USE_GPU
-			PerformanceCounter::StartCounter();
-#endif // USE_GPU
+			if (imguiHandler->light1)
+			{
+				tracer.AddLight(light1);
+			}
+			if (imguiHandler->light2)
+			{
+				tracer.AddLight(light2);
+			}
+			if (imguiHandler->light3)
+			{
+				tracer.AddLight(light3);
+			}
+
+			if (!imguiHandler->useGpu)
+			{
+				PerformanceCounter::StartCounter();
+			}
+
 			tracer.Update();
-#ifndef USE_GPU
-			imguiHandler->rayTracingTime = PerformanceCounter::GetCounter();
-#endif // USE_GPU
-			
-#ifdef USE_GPU
-			tracer.CreateGpuBuffers(d3dDevice, &octreeBufferSRV, &lightBufferSRV, &sphereBufferSRV, &leafToSphereBuffer, &constantBufffer);
-
-			ID3D11RenderTargetView *nullRTV = nullptr;
-			d3dDeviceContext->OMSetRenderTargets(1, &nullRTV, nullptr);
- 			d3dDeviceContext->CSSetShader(computeShader, nullptr, 0);
- 			d3dDeviceContext->CSSetUnorderedAccessViews(0, 1, &screenTextureUAV, nullptr);
- 			d3dDeviceContext->CSSetShaderResources(0, 1, &sphereBufferSRV);
- 			d3dDeviceContext->CSSetShaderResources(1, 1, &lightBufferSRV);
-			d3dDeviceContext->CSSetShaderResources(2, 1, &octreeBufferSRV);
-			d3dDeviceContext->CSSetShaderResources(3, 1, &leafToSphereBuffer);
- 			d3dDeviceContext->CSSetConstantBuffers(0, 1, &constantBufffer);
-			
-			D3D11_QUERY_DESC desc;
-			desc.Query = D3D11_QUERY_TIMESTAMP_DISJOINT;
-			desc.MiscFlags = 0;
-			ID3D11Query *disjointQuery;
-			ID3D11Query *timestampStartQuery;
-			ID3D11Query *timestampEndQuery;
-			d3dDevice->CreateQuery(&desc, &disjointQuery);
-
-			desc.Query = D3D11_QUERY_TIMESTAMP;
-			d3dDevice->CreateQuery(&desc, &timestampStartQuery);
-			d3dDevice->CreateQuery(&desc, &timestampEndQuery);
-			d3dDeviceContext->Begin(disjointQuery);
-			d3dDeviceContext->End(timestampStartQuery);
- 			d3dDeviceContext->Dispatch(screenWidth / 16, screenHeight / 16, 1);
-
-			d3dDeviceContext->End(timestampEndQuery);
-			d3dDeviceContext->End(disjointQuery);
-
-			ID3D11UnorderedAccessView *nullUAV = nullptr;
-			d3dDeviceContext->CSSetUnorderedAccessViews(0, 1, &nullUAV, nullptr);
-			d3dDeviceContext->OMSetRenderTargets(1, &screenTextureRTV, nullptr);
-
-
-			UINT64 startTime = 0;
-			while (d3dDeviceContext->GetData(timestampStartQuery, &startTime, sizeof(startTime), 0) != S_OK);
-
-			UINT64 endTime = 0;
-			while (d3dDeviceContext->GetData(timestampEndQuery, &endTime, sizeof(endTime), 0) != S_OK);
-
-			D3D11_QUERY_DATA_TIMESTAMP_DISJOINT disjointData;
-			while (d3dDeviceContext->GetData(disjointQuery, &disjointData, sizeof(disjointData), 0) != S_OK);
-			
-			float kernelTime = 0.0f;
-			if (disjointData.Disjoint == FALSE)
+			if (!imguiHandler->useGpu)
 			{
-				UINT64 delta = endTime - startTime;
-				float frequency = static_cast<float>(disjointData.Frequency);
-				kernelTime = (delta / frequency) * 1000.0f;
+				imguiHandler->rayTracingTime = PerformanceCounter::GetCounter();
 			}
-			imguiHandler->rayTracingTime = kernelTime;
-#else
-			for (int i_pixel = 0; i_pixel < pixelCount; i_pixel++)
+
+			if (imguiHandler->useGpu)
 			{
-				unsigned int pixelStart = i_pixel * 4;
-				dstPointer[pixelStart + 0] = glm::clamp(srcPtr[pixelStart + 0], 0.0f, 1.f) * 255.0f;
-				dstPointer[pixelStart + 1] = glm::clamp(srcPtr[pixelStart + 1], 0.0f, 1.f) * 255.0f;
-				dstPointer[pixelStart + 2] = glm::clamp(srcPtr[pixelStart + 2], 0.0f, 1.f) * 255.0f;
-				dstPointer[pixelStart + 3] = glm::clamp(srcPtr[pixelStart + 3], 0.0f, 1.f) * 255.0f;
+				tracer.CreateGpuBuffers(d3dDevice, &octreeBufferSRV, &lightBufferSRV, &sphereBufferSRV, &leafToSphereBuffer, &constantBufffer);
+
+				ID3D11RenderTargetView *nullRTV = nullptr;
+				d3dDeviceContext->CSSetShader(computeShader, nullptr, 0);
+				d3dDeviceContext->CSSetUnorderedAccessViews(0, 1, &outputTextureUAV, nullptr);
+				d3dDeviceContext->CSSetShaderResources(0, 1, &sphereBufferSRV);
+				d3dDeviceContext->CSSetShaderResources(1, 1, &lightBufferSRV);
+				d3dDeviceContext->CSSetShaderResources(2, 1, &octreeBufferSRV);
+				d3dDeviceContext->CSSetShaderResources(3, 1, &leafToSphereBuffer);
+				d3dDeviceContext->CSSetConstantBuffers(0, 1, &constantBufffer);
+
+				D3D11_QUERY_DESC desc;
+				desc.Query = D3D11_QUERY_TIMESTAMP_DISJOINT;
+				desc.MiscFlags = 0;
+				ID3D11Query *disjointQuery;
+				ID3D11Query *timestampStartQuery;
+				ID3D11Query *timestampEndQuery;
+				d3dDevice->CreateQuery(&desc, &disjointQuery);
+
+				desc.Query = D3D11_QUERY_TIMESTAMP;
+				d3dDevice->CreateQuery(&desc, &timestampStartQuery);
+				d3dDevice->CreateQuery(&desc, &timestampEndQuery);
+				d3dDeviceContext->Begin(disjointQuery);
+				d3dDeviceContext->End(timestampStartQuery);
+				d3dDeviceContext->Dispatch(screenWidth / 8, screenHeight / 8, 1);
+
+				d3dDeviceContext->End(timestampEndQuery);
+				d3dDeviceContext->End(disjointQuery);
+
+// 				ID3D11UnorderedAccessView *nullUAV = nullptr;
+// 				d3dDeviceContext->CSSetUnorderedAccessViews(0, 1, &nullUAV, nullptr);
+// 				d3dDeviceContext->OMSetRenderTargets(1, &screenTextureRTV, nullptr);
+
+
+				UINT64 startTime = 0;
+				while (d3dDeviceContext->GetData(timestampStartQuery, &startTime, sizeof(startTime), 0) != S_OK);
+
+				UINT64 endTime = 0;
+				while (d3dDeviceContext->GetData(timestampEndQuery, &endTime, sizeof(endTime), 0) != S_OK);
+
+				D3D11_QUERY_DATA_TIMESTAMP_DISJOINT disjointData;
+				while (d3dDeviceContext->GetData(disjointQuery, &disjointData, sizeof(disjointData), 0) != S_OK);
+
+				float kernelTime = 0.0f;
+				if (disjointData.Disjoint == FALSE)
+				{
+					UINT64 delta = endTime - startTime;
+					float frequency = static_cast<float>(disjointData.Frequency);
+					kernelTime = (delta / frequency) * 1000.0f;
+				}
+				imguiHandler->rayTracingTime = kernelTime;
 			}
-#endif
+			else
+			{
+				for (int i_pixel = 0; i_pixel < pixelCount; i_pixel++)
+				{
+					unsigned int pixelStart = i_pixel * 4;
+					dstPointer[pixelStart + 0] = glm::clamp(srcPtr[pixelStart + 0], 0.0f, 1.f) * 255.0f;
+					dstPointer[pixelStart + 1] = glm::clamp(srcPtr[pixelStart + 1], 0.0f, 1.f) * 255.0f;
+					dstPointer[pixelStart + 2] = glm::clamp(srcPtr[pixelStart + 2], 0.0f, 1.f) * 255.0f;
+					dstPointer[pixelStart + 3] = glm::clamp(srcPtr[pixelStart + 3], 0.0f, 1.f) * 255.0f;
+				}
+
+				d3dDeviceContext->UpdateSubresource(outputTexture, 0, nullptr, dstPointer, sizeof(unsigned char) * 4 * screenWidth, 0);
+			}
+
 			imguiHandler->rebuildRequested = false;
 		}
 
@@ -511,15 +549,14 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
 			DispatchMessage(&msg);
 			continue;
 		}
-		//renderer.Render(d3dDeviceContext, &tracer.octree, viewProj);
 
-#ifndef USE_GPU 
-	d3dDeviceContext->UpdateSubresource(screenTexture, 0, nullptr, dstPointer, sizeof(unsigned char) * 4 * screenWidth, 0);
-#endif
-		
+		d3dDeviceContext->CopyResource(screenTexture, outputTexture);
+		if (imguiHandler->showOctree)
+		{
+			renderer.Render(d3dDeviceContext, &tracer.octree, viewProj);
+		}
  		imguiHandler->StartNewFrame();
  		imguiHandler->Render();
-
 		d3dSwapChain->Present(0, 0);
 	}
 

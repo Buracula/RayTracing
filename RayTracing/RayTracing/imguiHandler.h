@@ -1,5 +1,5 @@
 #pragma once
-#define BAHAR
+//#define BAHAR
 
 #include <d3d11.h>
 #include <imgui.h>
@@ -36,6 +36,11 @@ public:
 	void OnRender(ImDrawData* draw_data);
 
 	bool rebuildRequested;
+	bool useGpu;
+	bool showOctree;
+	bool light1;
+	bool light2;
+	bool light3;
 	int sphereCount;
 	bool sphereOverlap;
 	float minSphereRadiuses;

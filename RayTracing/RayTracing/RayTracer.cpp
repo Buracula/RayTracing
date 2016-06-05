@@ -1,6 +1,7 @@
 #include "RayTracer.h"
 #include <map>
 #include <assert.h>
+#include "imguiHandler.h"
 
 RayTracer::RayTracer()
 	:octree(3, 4)
@@ -182,10 +183,10 @@ void RayTracer::SetCameraParams(const glm::vec3 camPos, const glm::vec3 lookAt, 
 void RayTracer::Update()
 {
 	octree.Build(mSpheres);
-#ifdef USE_GPU
-	return;
-#endif // USE_GPU
-
+	if (imguiHandler->useGpu)
+	{
+		return;
+	}
 	
 	glm::vec2 dimension(mWidth, mHeight);
 	glm::vec2 _2(2.0f);

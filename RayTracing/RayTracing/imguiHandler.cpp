@@ -23,7 +23,12 @@ ImguiHandler::ImguiHandler(ID3D11DeviceContext *d3dDeviceContext, ID3D11Device *
 	g_pVB = NULL;
 	g_pIB = NULL;
 	rebuildRequested = true;
-	sphereCount = 3;
+	useGpu = true;
+	showOctree = false;
+	light1 = true;
+	light2 = false;
+	light3 = false;
+	sphereCount = 4;
 	sphereOverlap = true;
 	minSphereRadiuses = 2;
 	maxSphereRadiuses = 2;
@@ -270,11 +275,16 @@ void ImguiHandler::Render()
 	//ImGui::ShowTestWindow(&show_test_window);
 	ImGui::Begin("Settings");
 	ImGui::SetWindowPos(ImVec2(850, 20), ImGuiSetCond_FirstUseEver);
-	ImGui::SetWindowSize(ImVec2(400, 200), ImGuiSetCond_FirstUseEver);
+	ImGui::SetWindowSize(ImVec2(400, 230), ImGuiSetCond_FirstUseEver);
 	ImGui::SliderFloat("Min Sphere Radius", &minSphereRadiuses, 0.5f, 10.0f);
 	ImGui::SliderFloat("Max Sphere Radius", &maxSphereRadiuses, 0.5f, 10.0f);
 	ImGui::SliderInt("Sphere Count", &sphereCount, 1, 200);
 	ImGui::Checkbox("Spheres can overlap", &sphereOverlap);
+	ImGui::Checkbox("Use GPU", &useGpu);
+	ImGui::Checkbox("Show Octree", &showOctree);
+	ImGui::Checkbox("Enable Light 1", &light1);
+	ImGui::Checkbox("Enable Light 2", &light2);
+	ImGui::Checkbox("Enable Light 3", &light3);
 
 	std::string rayTracingTimeText = std::to_string(rayTracingTime);
 	ImGui::LabelText(rayTracingTimeText.c_str(), "RayTrace Time(ms):");

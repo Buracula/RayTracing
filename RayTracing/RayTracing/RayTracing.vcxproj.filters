@@ -71,5 +71,11 @@
     <ClInclude Include="Sphere.h">
       <Filter>Source Files</Filter>
     </ClInclude>
+    <ClInclude Include="PerformanceCounter.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+  </ItemGroup>
+  <ItemGroup>
+    <None Include="..\x64\Debug\ComputeShader.compute" />
   </ItemGroup>
 </Project>
