@@ -372,7 +372,7 @@ float4 trace(Ray ray)
 	}
 	else
 	{
-		return float4(129,191,212, 1)/255;
+		return float4(129, 191, 212, 1) / 255;
 	}
 }
 
